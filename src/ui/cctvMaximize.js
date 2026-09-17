@@ -1,4 +1,8 @@
-import { attachVideoSource } from '../layers/cctv/hlsPlayback.js';
+import {
+  fetchStreamInfo,
+  mountCameraMedia,
+  STREAM_INFO_TIMEOUT_MS,
+} from './cctvMedia.js';
 
 /**
  * Penampil CCTV layar penuh.
@@ -30,10 +34,8 @@ import { attachVideoSource } from '../layers/cctv/hlsPlayback.js';
  * jalan keluar, dan setiap jalur (tutup, ganti kamera, hancurkan) melewatinya.
  */
 
-/** Selang penyegaran bingkai untuk umpan gambar diam. */
+/** Selang penyegaran bingkai untuk umpan gambar diam di layar penuh. */
 const IMAGE_REFRESH_MS = 10000;
-/** Batas waktu permintaan info aliran. */
-const STREAM_INFO_TIMEOUT_MS = 8000;
 
 /**
  * Pasang penampil CCTV layar penuh.
@@ -67,17 +69,12 @@ export function createCctvMaximizeViewer({
   let currentCameraId = null;
   /** Pembongkar media yang sedang aktif (video hls.js atau timer gambar). */
   let detachMedia = null;
-  let refreshTimer = 0;
   let inFlight = null;
   let destroyed = false;
   const removers = [];
 
   /** Hentikan media apa pun yang sedang berjalan dan kosongkan panggung. */
   const teardownMedia = () => {
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
-      refreshTimer = 0;
-    }
     if (inFlight) {
       inFlight.abort();
       inFlight = null;
@@ -101,55 +98,27 @@ export function createCctvMaximizeViewer({
   };
 
   /**
-   * Bangun elemen video untuk umpan bergerak.
+   * Pasang media kamera ke panggung lewat pemasang bersama (cctvMedia.js),
+   * sehingga layar penuh dan dinding 3x3 memutuskan video-atau-gambar dengan
+   * aturan yang sama persis.
    *
-   * @param {string} mediaUrl URL yang sudah diproksikan.
-   * @param {string} feedType Jenis umpan yang sudah dinormalkan.
+   * @param {object} info Info aliran.
+   * @returns {boolean} true bila ada yang terpasang.
    */
-  const mountVideo = (mediaUrl, feedType) => {
-    const video = documentRef.createElement('video');
-    video.className = 'cctv-maximize-media';
-    video.muted = true;
-    video.autoplay = true;
-    video.playsInline = true;
-    video.controls = false;
-    video.preload = 'auto';
-    video.addEventListener('canplay', () => {
-      setStatus('');
-      video.play().catch(() => {});
+  const mountMedia = (info) => {
+    const entry = mountCameraMedia({
+      documentRef,
+      container: stage,
+      info,
+      className: 'cctv-maximize-media',
+      refreshMs: IMAGE_REFRESH_MS,
+      onState: (state) =>
+        setStatus(state === 'ready' ? '' : 'Umpan tidak tersedia'),
     });
-    video.addEventListener('error', () => setStatus('Umpan tidak tersedia'));
-    stage.replaceChildren(video);
-    // hls.js untuk HLS, penetapan src langsung untuk mp4/webm — lihat
-    // hlsPlayback.js. Pembongkarnya dikembalikan apa pun jalur yang dipakai.
-    detachMedia = attachVideoSource(video, mediaUrl, feedType);
+    if (!entry) return false;
+    detachMedia = entry.detach;
+    return true;
   };
-
-  /**
-   * Bangun elemen gambar untuk umpan diam, dengan penyegaran berkala.
-   *
-   * @param {string} frameUrl URL bingkai.
-   */
-  const mountImage = (frameUrl) => {
-    const img = documentRef.createElement('img');
-    img.className = 'cctv-maximize-media';
-    img.alt = 'Bingkai umpan CCTV';
-    img.decoding = 'async';
-    img.addEventListener('load', () => setStatus(''));
-    img.addEventListener('error', () => setStatus('Bingkai tidak tersedia'));
-    // Parameter waktu memaksa pengambilan baru; tanpa itu peramban menyajikan
-    // bingkai yang sama dari cache dan gambar tampak beku.
-    const paint = () => {
-      img.src = `${frameUrl}${frameUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
-    };
-    paint();
-    stage.replaceChildren(img);
-    refreshTimer = setInterval(paint, IMAGE_REFRESH_MS);
-    detachMedia = () => {
-      img.removeAttribute('src');
-    };
-  };
-
   /**
    * Buka penampil untuk satu kamera.
    *
@@ -183,13 +152,7 @@ export function createCctvMaximizeViewer({
     const timeout = setTimeout(() => controller.abort(), STREAM_INFO_TIMEOUT_MS);
     let info = null;
     try {
-      const resp = await fetch(
-        `/api/cctv/stream/${encodeURIComponent(id)}`,
-        { signal: controller.signal },
-      );
-      if (resp.ok) info = await resp.json();
-    } catch {
-      info = null;
+      info = await fetchStreamInfo(id, { signal: controller.signal });
     } finally {
       clearTimeout(timeout);
       if (inFlight === controller) inFlight = null;
@@ -204,12 +167,7 @@ export function createCctvMaximizeViewer({
       return false;
     }
 
-    const feedType = String(info.feedType || 'image');
-    const isVideo =
-      feedType === 'hls' || feedType === 'mp4' || feedType === 'webm';
-    if (isVideo && info.mediaUrl) mountVideo(info.mediaUrl, feedType);
-    else if (info.frameUrl) mountImage(info.frameUrl);
-    else {
+    if (!mountMedia(info)) {
       setStatus('Kamera ini tidak menyediakan umpan');
       return false;
     }

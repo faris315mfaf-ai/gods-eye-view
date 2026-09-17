@@ -45,6 +45,7 @@
         <span id="cctv-quality-chip">CAL · --</span>
       </div>
       <div class="cctv-controls">
+        <button id="cctv-wall-btn" class="scene-btn" title="Open a 3x3 wall of the nine nearest cameras">3×3 WALL</button>
         <button id="cctv-maximize-btn" class="scene-btn" title="Show the active camera feed full screen">FULL SCREEN</button>
         <button id="cctv-auto-maximize-btn" class="scene-btn" title="Open full screen automatically whenever a camera is selected" aria-pressed="false">AUTO FULL OFF</button>
       </div>
@@ -123,6 +124,19 @@
       </div>
       <div id="cctv-maximize-stage" class="cctv-maximize-stage"></div>
       <div id="cctv-maximize-status" class="cctv-maximize-status" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
+
+  <!-- Dinding CCTV 3x3. Membuka sembilan umpan langsung sekaligus; lihat
+       src/ui/cctvWall.js. -->
+  <div id="cctv-wall" class="cctv-wall" role="dialog" aria-modal="true" aria-labelledby="cctv-wall-title" hidden>
+    <div class="cctv-wall-frame">
+      <div class="cctv-wall-bar">
+        <div id="cctv-wall-title" class="cctv-wall-title">CCTV WALL</div>
+        <button id="cctv-wall-close" class="cctv-wall-close" type="button" aria-label="Close the camera wall" title="Close (Esc)">✕</button>
+      </div>
+      <div id="cctv-wall-grid" class="cctv-wall-grid"></div>
+      <div class="cctv-wall-hint">Click any tile to open it full screen</div>
     </div>
   </div>
   </div>

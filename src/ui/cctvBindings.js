@@ -1,3 +1,4 @@
+import { selectWallCameras } from './cctvWall.js';
 export function _initCctvPanel() {
   if (!this._cctvPanel) return;
 
@@ -195,6 +196,7 @@ export function _initCctvMaximizeControls() {
     if (this._autoMaximize && this._cctvState?.activeCameraId) openActive();
   });
 
+  this._initCctvWallControls();
   this._syncAutoMaximizeButton();
 }
 
@@ -206,4 +208,32 @@ export function _syncAutoMaximizeButton() {
   button.classList.toggle('active', on);
   button.setAttribute('aria-pressed', String(on));
   button.textContent = on ? 'AUTO PENUH AKTIF' : 'AUTO PENUH MATI';
+}
+
+/**
+ * Pasang tombol dinding 3x3.
+ *
+ * Dipanggil dari `_initCctvMaximizeControls`, karena dinding dan layar penuh
+ * adalah dua sisi permukaan yang sama: dinding untuk memindai kawasan, layar
+ * penuh untuk memeriksa satu kamera.
+ */
+export function _initCctvWallControls() {
+  this.listen(this._cctvWallBtn, 'click', () => {
+    const state = this._cctvState;
+    const cameras = state?.cameras || [];
+    if (!cameras.length) return;
+    // Kamera aktif menjadi acuan sehingga dinding terbaca sebagai satu
+    // kawasan; tanpa kamera aktif, sembilan pertama sudah cukup.
+    const anchor =
+      state.activeCamera ||
+      cameras.find((entry) => entry.id === state?.activeCameraId) ||
+      null;
+    const selected = selectWallCameras(cameras, anchor);
+    if (!selected.length) return;
+    this._wall?.open(selected, {
+      title: anchor?.city
+        ? `DINDING CCTV 3×3 · ${String(anchor.city).toUpperCase()}`
+        : 'DINDING CCTV 3×3',
+    });
+  });
 }

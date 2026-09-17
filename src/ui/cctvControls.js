@@ -19,9 +19,11 @@ import {
 import {
   _initCctvPanel,
   _initCctvMaximizeControls,
+  _initCctvWallControls,
   _syncAutoMaximizeButton,
 } from './cctvBindings.js';
 import { createCctvMaximizeViewer } from './cctvMaximize.js';
+import { createCctvWall } from './cctvWall.js';
 
 /** Own camera-panel interaction and presentation; receive the camera port and application actions. */
 export class CctvControls {
@@ -46,6 +48,12 @@ export class CctvControls {
     // klik yang sudah ada tidak berubah bagi operator yang tidak memintanya.
     this._maximizeViewer = createCctvMaximizeViewer({});
     this._autoMaximize = false;
+    // Mengklik sebuah kotak dinding menaikkannya ke layar penuh, yang menumpuk
+    // DI ATAS dinding — menutupnya mengembalikan operator ke dinding.
+    this._wall = createCctvWall({
+      onCellActivate: (cameraId, meta) =>
+        this._maximizeViewer?.open(cameraId, meta),
+    });
     this._initCctvPanel();
   }
   listen(target, type, handler, options = {}) {
@@ -108,6 +116,9 @@ export class CctvControls {
   _initCctvMaximizeControls(...args) {
     return _initCctvMaximizeControls.call(this, ...args);
   }
+  _initCctvWallControls(...args) {
+    return _initCctvWallControls.call(this, ...args);
+  }
   _syncAutoMaximizeButton(...args) {
     return _syncAutoMaximizeButton.call(this, ...args);
   }
@@ -121,6 +132,8 @@ export class CctvControls {
     this._calibrationEdit?.(false);
     this._maximizeViewer?.destroy();
     this._maximizeViewer = null;
+    this._wall?.destroy();
+    this._wall = null;
     this._clearCctvFrame();
     clearInterval(this._cctvSummaryTypingTimer);
     clearTimeout(this._cctvChipHideTimer);

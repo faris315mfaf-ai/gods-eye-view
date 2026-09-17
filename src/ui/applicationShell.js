@@ -1900,6 +1900,7 @@ export class StyleManager {
         _cctvFocusBtn: this._cctvFocusBtn,
         _cctvFrame: this._cctvFrame,
         _cctvFrameWrap: this._cctvFrameWrap,
+        _cctvWallBtn: this._cctvWallBtn,
         _cctvMaximizeBtn: this._cctvMaximizeBtn,
         _cctvAutoMaximizeBtn: this._cctvAutoMaximizeBtn,
         _cctvMeta: this._cctvMeta,

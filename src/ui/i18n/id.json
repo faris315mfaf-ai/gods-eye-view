@@ -326,5 +326,10 @@
   "Show the active camera feed full screen": "Tampilkan umpan kamera aktif pada layar penuh",
   "Close full screen view": "Tutup tampilan layar penuh",
   "Close (Esc)": "Tutup (Esc)",
-  "Open full screen automatically whenever a camera is selected": "Buka layar penuh otomatis setiap kali sebuah kamera dipilih"
+  "Open full screen automatically whenever a camera is selected": "Buka layar penuh otomatis setiap kali sebuah kamera dipilih",
+  "CCTV WALL": "DINDING CCTV",
+  "3×3 WALL": "DINDING 3×3",
+  "Close the camera wall": "Tutup dinding kamera",
+  "Click any tile to open it full screen": "Klik salah satu kotak untuk membukanya pada layar penuh",
+  "Open a 3x3 wall of the nine nearest cameras": "Buka dinding 3×3 berisi sembilan kamera terdekat"
 }

@@ -500,3 +500,186 @@
     max-height: calc(100vh - 120px);
   }
 }
+
+/* --------------------------------------------------------------------------
+ * Dinding CCTV 3x3 (src/ui/cctvWall.js)
+ *
+ * Satu lapis di bawah penampil layar penuh, karena mengklik sebuah kotak
+ * membuka layar penuh DI ATAS dinding — operator kembali ke dinding saat
+ * menutupnya, bukan ke peta.
+ * ------------------------------------------------------------------------ */
+
+.cctv-wall {
+  position: fixed;
+  inset: 0;
+  z-index: 8900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(10px, 2.5vw, 36px);
+  background: rgba(4, 8, 12, 0.9);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.cctv-wall.active {
+  opacity: 1;
+}
+
+.cctv-wall[hidden] {
+  display: none;
+}
+
+.cctv-wall-frame {
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 1700px);
+  max-height: 100%;
+  border: 1px solid rgba(0, 246, 255, 0.35);
+  border-radius: 6px;
+  background: #05080c;
+  box-shadow: 0 0 44px rgba(0, 246, 255, 0.14);
+  overflow: hidden;
+}
+
+.cctv-wall-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(0, 246, 255, 0.22);
+  background: rgba(8, 16, 22, 0.94);
+}
+
+.cctv-wall-title {
+  flex: 1;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: #d6f6ff;
+  text-transform: uppercase;
+}
+
+.cctv-wall-close {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(0, 246, 255, 0.35);
+  border-radius: 4px;
+  background: rgba(0, 246, 255, 0.08);
+  color: #9fe8ff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cctv-wall-close:hover {
+  background: rgba(0, 246, 255, 0.2);
+  color: #ffffff;
+}
+
+.cctv-wall-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 2px;
+  background: rgba(0, 246, 255, 0.12);
+  overflow: auto;
+}
+
+.cctv-wall-cell {
+  position: relative;
+  /* Kotak 16:9 menjaga kesembilan baris tetap sama tingginya, apa pun rasio
+     kamera yang sebenarnya — kisi yang barisnya melompat-lompat sulit dipindai. */
+  aspect-ratio: 16 / 9;
+  background: #000000;
+  cursor: zoom-in;
+  overflow: hidden;
+}
+
+.cctv-wall-cell:hover {
+  outline: 1px solid rgba(0, 246, 255, 0.6);
+  outline-offset: -1px;
+}
+
+.cctv-wall-stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cctv-wall-media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000000;
+}
+
+.cctv-wall-cell-label {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 4px 6px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.82));
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  color: #cdeffd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.cctv-wall-cell-status {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(140, 200, 220, 0.8);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.cctv-wall-cell-status[hidden] {
+  display: none;
+}
+
+.cctv-wall-hint {
+  padding: 7px 14px;
+  border-top: 1px solid rgba(0, 246, 255, 0.18);
+  background: rgba(8, 16, 22, 0.94);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(150, 210, 230, 0.85);
+  text-transform: uppercase;
+}
+
+@media (max-width: 640px) {
+  .cctv-wall {
+    padding: 0;
+  }
+
+  .cctv-wall-frame {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border: none;
+    border-radius: 0;
+  }
+
+  /* Sembilan kotak selebar telepon terlalu kecil untuk dibaca; dua kolom
+     dengan pengguliran lebih berguna daripada kisi tiga kolom yang mustahil. */
+  .cctv-wall-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

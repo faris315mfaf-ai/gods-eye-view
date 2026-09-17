@@ -140,6 +140,7 @@ export function readShellElements(document = globalThis.document) {
     _cctvCalReadout: document.getElementById('cctv-cal-readout'),
     _cctvCalibSaveBtn: document.getElementById('cctv-calib-save-btn'),
     _cctvCalibResetBtn: document.getElementById('cctv-calib-reset-btn'),
+    _cctvWallBtn: document.getElementById('cctv-wall-btn'),
     _cctvMaximizeBtn: document.getElementById('cctv-maximize-btn'),
     _cctvAutoMaximizeBtn: document.getElementById('cctv-auto-maximize-btn'),
     _cctvFrame: document.getElementById('cctv-frame'),
