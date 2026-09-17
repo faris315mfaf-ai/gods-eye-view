@@ -43,14 +43,36 @@ export function _renderCctvState(state) {
     this.actions.setPanelCollapsed('cctv-panel', false, {
       explicit: Boolean(state?.explicitSelection),
     });
+    // AUTO FULL: membuka penampil layar penuh pada kondisi yang sama persis
+    // yang membentangkan panel — sebuah kamera baru benar-benar dipilih, bukan
+    // sekadar loncatan otomatis. Menyalinnya ke syarat sendiri akan membuat
+    // keduanya lepas sinkron begitu salah satu diubah.
+    if (this._autoMaximize && this._maximizeViewer) {
+      const camera =
+        activeCamera ||
+        cameras.find((entry) => entry.id === effectiveActiveId) ||
+        null;
+      this._maximizeViewer.open(effectiveActiveId, {
+        name: camera?.name || effectiveActiveId,
+        city: camera?.city || '',
+        provider: camera?.provider || '',
+      });
+    }
   }
   this._lastSeenCctvActiveId = effectiveActiveId;
+
+  // Mematikan layer, atau kehilangan kamera aktif, harus menutup penampil:
+  // membiarkannya terbuka akan menyisakan umpan yang memutar kamera yang
+  // menurut sisa antarmuka sudah tidak dipilih.
+  if (!effectiveActiveId && this._maximizeViewer?.isOpen?.()) {
+    this._maximizeViewer.close();
+  }
 
   this._updateCctvSyncChip(state?.loading, enabled);
 
   if (this._cctvEnableBtn) {
     this._cctvEnableBtn.classList.toggle('active', enabled);
-    this._cctvEnableBtn.textContent = enabled ? 'CCTV ON' : 'CCTV OFF';
+    this._cctvEnableBtn.textContent = enabled ? 'CCTV AKTIF' : 'CCTV MATI';
   }
 
   if (this._cctvSelect) {
@@ -98,17 +120,19 @@ export function _renderCctvState(state) {
     this._cctvCoverageBtn.classList.toggle('active', mode !== 'off');
     this._cctvCoverageBtn.textContent =
       mode === 'viewshed'
-        ? 'VIEWSHED ON'
+        ? 'BIDANG PANDANG AKTIF'
         : mode === 'on'
-          ? 'COVERAGE ON'
-          : 'COVERAGE OFF';
+          ? 'CAKUPAN AKTIF'
+          : 'CAKUPAN MATI';
     this._cctvCoverageBtn.disabled = !enabled;
   }
 
   if (this._cctvAutoHopBtn) {
     const autoHop = !!state?.autoHop;
     this._cctvAutoHopBtn.classList.toggle('active', autoHop);
-    this._cctvAutoHopBtn.textContent = autoHop ? 'AUTO HOP ON' : 'AUTO HOP OFF';
+    this._cctvAutoHopBtn.textContent = autoHop
+      ? 'LONCAT OTOMATIS AKTIF'
+      : 'LONCAT OTOMATIS MATI';
     this._cctvAutoHopBtn.disabled = !enabled;
   }
 
@@ -116,8 +140,8 @@ export function _renderCctvState(state) {
     const showProjection = state?.showProjection !== false;
     this._cctvProjectionBtn.classList.toggle('active', showProjection);
     this._cctvProjectionBtn.textContent = showProjection
-      ? 'PROJECTION ON'
-      : 'PROJECTION OFF';
+      ? 'PROYEKSI AKTIF'
+      : 'PROYEKSI MATI';
     this._cctvProjectionBtn.disabled = !enabled;
   }
 
@@ -157,8 +181,8 @@ export function _renderCctvState(state) {
       this._cctvMeta.textContent = `${activeCamera.city} · HDG ${Math.round(activeCamera.headingDeg)}° · FOV ${Math.round(activeCamera.fovDeg)}° · RANGE ${Math.round(activeCamera.rangeM)}m · ${projLabel}${calBadge ? ` · ${calBadge}` : ''} · ${provider}${credit}${statusMsg}`;
     } else if (cameras.length > 0) {
       this._cctvMeta.textContent = enabled
-        ? `${cameras.length} cameras loaded · click a camera to activate`
-        : `${cameras.length} cameras loaded · enable CCTV to activate`;
+        ? `${cameras.length} kamera dimuat · klik sebuah kamera untuk mengaktifkan`
+        : `${cameras.length} kamera dimuat · aktifkan CCTV untuk mengaktifkan kamera`;
     } else {
       this._cctvMeta.textContent =
         'Aktifkan CCTV untuk memuat persimpangan berkamera';

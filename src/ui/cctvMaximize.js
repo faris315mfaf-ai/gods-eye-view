@@ -1,0 +1,276 @@
+import { attachVideoSource } from '../layers/cctv/hlsPlayback.js';
+
+/**
+ * Penampil CCTV layar penuh.
+ *
+ * KENAPA ADA MODUL INI
+ * --------------------
+ * Pratinjau di panel kanan berukuran beberapa ratus piksel dan hanya berupa
+ * gambar diam yang disegarkan berkala. Untuk benar-benar MELIHAT sebuah
+ * persimpangan — membaca antrean kendaraan, melihat apakah lampu menyala —
+ * operator butuh bingkainya besar, dan untuk kamera Indonesia yang semuanya
+ * HLS, butuh videonya yang hidup, bukan potongan gambar.
+ *
+ * Penampil ini dibuka dari dua tempat: mengklik pratinjau di panel, dan
+ * mengklik ikon kamera di peta. Keduanya memanggil `open(cameraId, meta)`.
+ *
+ * SATU SUMBER KEBENARAN UNTUK JENIS UMPAN
+ * ---------------------------------------
+ * Jenis umpan tidak ditebak dari katalog di sisi klien, melainkan dibaca dari
+ * `/api/cctv/stream/:id`, yang sudah menjadi jawaban resmi proxy: umpan video
+ * (hls/mp4/webm) mendapat elemen <video>, selain itu <img> yang disegarkan.
+ * Menebaknya di dua tempat berarti dua tempat yang bisa salah.
+ *
+ * SIKLUS HIDUP ADALAH BAGIAN YANG RAWAN
+ * -------------------------------------
+ * Membuka kamera lain selagi satu sedang diputar harus membongkar pemutar
+ * sebelumnya, membatalkan permintaan yang masih berjalan, dan menghentikan
+ * timer penyegar — kalau tidak, pemutar hls.js dan interval akan menumpuk
+ * setiap kali operator berpindah kamera. `teardownMedia()` adalah satu-satunya
+ * jalan keluar, dan setiap jalur (tutup, ganti kamera, hancurkan) melewatinya.
+ */
+
+/** Selang penyegaran bingkai untuk umpan gambar diam. */
+const IMAGE_REFRESH_MS = 10000;
+/** Batas waktu permintaan info aliran. */
+const STREAM_INFO_TIMEOUT_MS = 8000;
+
+/**
+ * Pasang penampil CCTV layar penuh.
+ *
+ * @param {object} options
+ * @param {Document} [options.documentRef] Dokumen tempat elemen berada.
+ * @param {(message: string) => void} [options.showToast] Penampil pesan singkat.
+ * @returns {{open: Function, close: Function, isOpen: Function, destroy: Function}}
+ */
+export function createCctvMaximizeViewer({
+  // Dibaca dari globalThis, bukan dari `document` telanjang: panel CCTV juga
+  // dibangun di lingkungan uji tanpa DOM, dan sebuah referensi telanjang di
+  // sini akan melempar ReferenceError saat konstruksi panel, bukan saat
+  // penampil ini dipakai.
+  documentRef = globalThis.document,
+  showToast = null,
+} = {}) {
+  const root = documentRef?.getElementById?.('cctv-maximize') || null;
+  const stage = documentRef?.getElementById?.('cctv-maximize-stage') || null;
+  const titleEl = documentRef?.getElementById?.('cctv-maximize-title') || null;
+  const metaEl = documentRef?.getElementById?.('cctv-maximize-meta') || null;
+  const statusEl = documentRef?.getElementById?.('cctv-maximize-status') || null;
+  const closeBtn = documentRef?.getElementById?.('cctv-maximize-close') || null;
+
+  // Tanpa DOM atau tanpa markup-nya, modul ini tidak melakukan apa pun tetapi
+  // tetap memenuhi kontraknya, sehingga pemanggil tidak perlu memeriksa null
+  // di setiap pemakaian.
+  const inert = !documentRef || !root || !stage;
+
+  let open = false;
+  let currentCameraId = null;
+  /** Pembongkar media yang sedang aktif (video hls.js atau timer gambar). */
+  let detachMedia = null;
+  let refreshTimer = 0;
+  let inFlight = null;
+  let destroyed = false;
+  const removers = [];
+
+  /** Hentikan media apa pun yang sedang berjalan dan kosongkan panggung. */
+  const teardownMedia = () => {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = 0;
+    }
+    if (inFlight) {
+      inFlight.abort();
+      inFlight = null;
+    }
+    if (detachMedia) {
+      try {
+        detachMedia();
+      } catch {
+        /* pembongkaran tidak boleh melempar */
+      }
+      detachMedia = null;
+    }
+    if (stage) stage.replaceChildren();
+  };
+
+  /** Tulis baris status; string kosong menyembunyikannya. */
+  const setStatus = (text) => {
+    if (!statusEl) return;
+    statusEl.textContent = String(text || '');
+    statusEl.hidden = !text;
+  };
+
+  /**
+   * Bangun elemen video untuk umpan bergerak.
+   *
+   * @param {string} mediaUrl URL yang sudah diproksikan.
+   * @param {string} feedType Jenis umpan yang sudah dinormalkan.
+   */
+  const mountVideo = (mediaUrl, feedType) => {
+    const video = documentRef.createElement('video');
+    video.className = 'cctv-maximize-media';
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.controls = false;
+    video.preload = 'auto';
+    video.addEventListener('canplay', () => {
+      setStatus('');
+      video.play().catch(() => {});
+    });
+    video.addEventListener('error', () => setStatus('Umpan tidak tersedia'));
+    stage.replaceChildren(video);
+    // hls.js untuk HLS, penetapan src langsung untuk mp4/webm — lihat
+    // hlsPlayback.js. Pembongkarnya dikembalikan apa pun jalur yang dipakai.
+    detachMedia = attachVideoSource(video, mediaUrl, feedType);
+  };
+
+  /**
+   * Bangun elemen gambar untuk umpan diam, dengan penyegaran berkala.
+   *
+   * @param {string} frameUrl URL bingkai.
+   */
+  const mountImage = (frameUrl) => {
+    const img = documentRef.createElement('img');
+    img.className = 'cctv-maximize-media';
+    img.alt = 'Bingkai umpan CCTV';
+    img.decoding = 'async';
+    img.addEventListener('load', () => setStatus(''));
+    img.addEventListener('error', () => setStatus('Bingkai tidak tersedia'));
+    // Parameter waktu memaksa pengambilan baru; tanpa itu peramban menyajikan
+    // bingkai yang sama dari cache dan gambar tampak beku.
+    const paint = () => {
+      img.src = `${frameUrl}${frameUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    };
+    paint();
+    stage.replaceChildren(img);
+    refreshTimer = setInterval(paint, IMAGE_REFRESH_MS);
+    detachMedia = () => {
+      img.removeAttribute('src');
+    };
+  };
+
+  /**
+   * Buka penampil untuk satu kamera.
+   *
+   * @param {string} cameraId Id kamera.
+   * @param {{name?: string, city?: string, provider?: string}} [meta] Label.
+   * @returns {Promise<boolean>} true bila panggung berhasil dipasang.
+   */
+  async function openCamera(cameraId, meta = {}) {
+    if (inert || destroyed) return false;
+    const id = String(cameraId || '').trim();
+    if (!id) return false;
+
+    // Berpindah kamera membongkar yang lama lebih dulu, jadi pemutar dan timer
+    // tidak pernah menumpuk.
+    teardownMedia();
+    currentCameraId = id;
+    open = true;
+    root.hidden = false;
+    root.classList.add('active');
+    documentRef.body?.classList.add('cctv-maximize-open');
+
+    if (titleEl) titleEl.textContent = meta.name || id;
+    if (metaEl) {
+      metaEl.textContent = [meta.city, meta.provider].filter(Boolean).join(' · ');
+    }
+    setStatus('Menghubungkan…');
+    closeBtn?.focus?.({ preventScroll: true });
+
+    const controller = new AbortController();
+    inFlight = controller;
+    const timeout = setTimeout(() => controller.abort(), STREAM_INFO_TIMEOUT_MS);
+    let info = null;
+    try {
+      const resp = await fetch(
+        `/api/cctv/stream/${encodeURIComponent(id)}`,
+        { signal: controller.signal },
+      );
+      if (resp.ok) info = await resp.json();
+    } catch {
+      info = null;
+    } finally {
+      clearTimeout(timeout);
+      if (inFlight === controller) inFlight = null;
+    }
+
+    // Operator bisa menutup atau berpindah kamera selagi permintaan berjalan;
+    // jawaban yang datang untuk kamera yang bukan lagi yang aktif dibuang.
+    if (destroyed || !open || currentCameraId !== id) return false;
+
+    if (!info) {
+      setStatus('Tidak dapat memuat info kamera');
+      return false;
+    }
+
+    const feedType = String(info.feedType || 'image');
+    const isVideo =
+      feedType === 'hls' || feedType === 'mp4' || feedType === 'webm';
+    if (isVideo && info.mediaUrl) mountVideo(info.mediaUrl, feedType);
+    else if (info.frameUrl) mountImage(info.frameUrl);
+    else {
+      setStatus('Kamera ini tidak menyediakan umpan');
+      return false;
+    }
+
+    if (metaEl && info.provider && !meta.provider) {
+      metaEl.textContent = [meta.city, info.provider]
+        .filter(Boolean)
+        .join(' · ');
+    }
+    return true;
+  }
+
+  /** Tutup penampil dan lepaskan seluruh media. */
+  function close() {
+    if (inert) return;
+    teardownMedia();
+    open = false;
+    currentCameraId = null;
+    root.classList.remove('active');
+    root.hidden = true;
+    documentRef.body?.classList.remove('cctv-maximize-open');
+    setStatus('');
+  }
+
+  const listen = (element, type, handler, opts) => {
+    if (!element) return;
+    element.addEventListener(type, handler, opts);
+    removers.push(() => element.removeEventListener(type, handler, opts));
+  };
+
+  if (!inert) {
+    listen(closeBtn, 'click', close);
+    // Mengklik latar menutup; mengklik panggung tidak, supaya operator bisa
+    // berinteraksi dengan bingkainya tanpa penampil tertutup tak sengaja.
+    listen(root, 'click', (event) => {
+      if (event.target === root) close();
+    });
+    listen(documentRef, 'keydown', (event) => {
+      if (!open) return;
+      if (event.key === 'Escape') {
+        // Escape di sini tidak boleh juga menutup pencarian atau keluar dari
+        // kokpit di pendengar lain.
+        event.stopPropagation();
+        event.preventDefault();
+        close();
+      }
+    });
+  }
+
+  return {
+    open: openCamera,
+    close,
+    isOpen: () => open,
+    currentCameraId: () => currentCameraId,
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      close();
+      for (const remove of removers) remove();
+      removers.length = 0;
+      void showToast;
+    },
+  };
+}

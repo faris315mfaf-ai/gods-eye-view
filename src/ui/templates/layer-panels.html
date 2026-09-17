@@ -44,6 +44,10 @@
         <button id="cctv-projection-btn" class="scene-btn">PROJECTION ON</button>
         <span id="cctv-quality-chip">CAL · --</span>
       </div>
+      <div class="cctv-controls">
+        <button id="cctv-maximize-btn" class="scene-btn" title="Show the active camera feed full screen">FULL SCREEN</button>
+        <button id="cctv-auto-maximize-btn" class="scene-btn" title="Open full screen automatically whenever a camera is selected" aria-pressed="false">AUTO FULL OFF</button>
+      </div>
       <div class="cctv-calibration-block">
         <div class="cctv-calibration-header">
           <div class="cctv-summary-label">CALIBRATION</div>
@@ -105,4 +109,20 @@
     </div>
   </div>
 
+
+  <!-- Penampil CCTV layar penuh. Dibuka dari pratinjau panel dan dari ikon
+       kamera di peta; lihat src/ui/cctvMaximize.js. -->
+  <div id="cctv-maximize" class="cctv-maximize" role="dialog" aria-modal="true" aria-labelledby="cctv-maximize-title" hidden>
+    <div class="cctv-maximize-frame">
+      <div class="cctv-maximize-bar">
+        <div class="cctv-maximize-labels">
+          <div id="cctv-maximize-title" class="cctv-maximize-title">CCTV</div>
+          <div id="cctv-maximize-meta" class="cctv-maximize-meta"></div>
+        </div>
+        <button id="cctv-maximize-close" class="cctv-maximize-close" type="button" aria-label="Close full screen view" title="Close (Esc)">✕</button>
+      </div>
+      <div id="cctv-maximize-stage" class="cctv-maximize-stage"></div>
+      <div id="cctv-maximize-status" class="cctv-maximize-status" role="status" aria-live="polite" hidden></div>
+    </div>
+  </div>
   </div>

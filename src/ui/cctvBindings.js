@@ -1,6 +1,8 @@
 export function _initCctvPanel() {
   if (!this._cctvPanel) return;
 
+  this._initCctvMaximizeControls();
+
   this.listen(this._cctvEnableBtn, 'click', async () => {
     this._actionGeneration++;
     await this.actions.toggleEnabled();
@@ -152,4 +154,56 @@ export function _initCctvPanel() {
 
   this._renderCctvState(null);
   this.actions.syncViewport();
+}
+
+/**
+ * Pasang kontrol layar penuh: tombol FULL SCREEN, pengalih AUTO FULL, dan
+ * klik pada pratinjau di panel.
+ *
+ * Dipanggil dari `_initCctvPanel`. Dipisah agar jalur layar penuh dapat dibaca
+ * sebagai satu kesatuan, bukan tersebar di antara kontrol panel lainnya.
+ */
+export function _initCctvMaximizeControls() {
+  /** Buka penampil untuk kamera yang sedang aktif, bila ada. */
+  const openActive = () => {
+    const state = this._cctvState;
+    const id = state?.activeCameraId;
+    if (!id) {
+      // Tanpa kamera aktif tidak ada yang bisa diperbesar; diam lebih baik
+      // daripada membuka panggung kosong.
+      return;
+    }
+    const camera =
+      state.activeCamera ||
+      (state.cameras || []).find((entry) => entry.id === id) ||
+      null;
+    this._maximizeViewer?.open(id, {
+      name: camera?.name || id,
+      city: camera?.city || '',
+      provider: camera?.provider || '',
+    });
+  };
+
+  this.listen(this._cctvMaximizeBtn, 'click', openActive);
+  this.listen(this._cctvFrameWrap, 'click', openActive);
+
+  this.listen(this._cctvAutoMaximizeBtn, 'click', () => {
+    this._autoMaximize = !this._autoMaximize;
+    this._syncAutoMaximizeButton();
+    // Menyalakannya selagi sebuah kamera sudah aktif membuka kamera itu
+    // sekarang juga, supaya pengalihnya terasa langsung bekerja.
+    if (this._autoMaximize && this._cctvState?.activeCameraId) openActive();
+  });
+
+  this._syncAutoMaximizeButton();
+}
+
+/** Tulis label dan status tertekan pengalih AUTO FULL. */
+export function _syncAutoMaximizeButton() {
+  const button = this._cctvAutoMaximizeBtn;
+  if (!button) return;
+  const on = !!this._autoMaximize;
+  button.classList.toggle('active', on);
+  button.setAttribute('aria-pressed', String(on));
+  button.textContent = on ? 'AUTO PENUH AKTIF' : 'AUTO PENUH MATI';
 }

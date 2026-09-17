@@ -311,5 +311,20 @@
   "📍 Location: --": "📍 Lokasi: --",
   "Landmark: --": "Markah: --",
   "Scope": "Teropong",
-  "Scope — the circular viewport mask": "Teropong — masker lingkaran pada tampilan"
+  "Scope — the circular viewport mask": "Teropong — masker lingkaran pada tampilan",
+  "MAP VIEW ANGLE": "SUDUT PANDANG PETA",
+  "TOP": "ATAS",
+  "ANGLED": "SERONG",
+  "LOW": "RENDAH",
+  "STRAIGHTEN": "LURUSKAN",
+  "Look straight down — the easiest angle to read": "Lihat tegak lurus dari atas — sudut paling mudah dibaca",
+  "Moderate oblique angle": "Sudut serong sedang",
+  "Low angle — shows building faces and camera facings": "Sudut rendah — menampakkan fasad bangunan dan arah hadap kamera",
+  "Straighten the map: level the horizon, north up, looking straight down": "Luruskan peta: horizon rata, utara di atas, pandangan tegak lurus",
+  "FULL SCREEN": "LAYAR PENUH",
+  "AUTO FULL OFF": "AUTO PENUH MATI",
+  "Show the active camera feed full screen": "Tampilkan umpan kamera aktif pada layar penuh",
+  "Close full screen view": "Tutup tampilan layar penuh",
+  "Close (Esc)": "Tutup (Esc)",
+  "Open full screen automatically whenever a camera is selected": "Buka layar penuh otomatis setiap kali sebuah kamera dipilih"
 }

@@ -21,6 +21,7 @@ import { STYLES } from './effects.js';
 import { bindDisplayControls } from './displayControls.js';
 import { bindApplicationShortcuts } from './visualInput.js';
 import { bindKeyboardFlight } from './keyboardFlight.js';
+import { bindMapViewPresets } from './mapViewPresets.js';
 
 import * as Cesium from 'cesium';
 import { decodeBloomIntensity } from '../bloom.js';
@@ -1899,6 +1900,8 @@ export class StyleManager {
         _cctvFocusBtn: this._cctvFocusBtn,
         _cctvFrame: this._cctvFrame,
         _cctvFrameWrap: this._cctvFrameWrap,
+        _cctvMaximizeBtn: this._cctvMaximizeBtn,
+        _cctvAutoMaximizeBtn: this._cctvAutoMaximizeBtn,
         _cctvMeta: this._cctvMeta,
         _cctvNearestBtn: this._cctvNearestBtn,
         _cctvNextBtn: this._cctvNextBtn,
@@ -3297,6 +3300,17 @@ export class StyleManager {
         this._navigation.runOrientation(noun, navigate),
       showToast: (message) => this._showToast(message),
     });
+
+    // Prasetel sudut pandang peta berbagi animator dan aturan kepemilikan
+    // kamera yang sama dengan pengalih miring di bilah atas.
+    this._mapViewPresets?.destroy();
+    this._mapViewPresets = bindMapViewPresets({
+      viewer: this.viewer,
+      buttons: [...document.querySelectorAll('[data-map-view]')],
+      runNavigation: (noun, navigate) =>
+        this._navigation.runOrientation(noun, navigate),
+      showToast: (message) => this._showToast(message),
+    });
   }
 
   /**
@@ -3691,6 +3705,7 @@ export class StyleManager {
     this._frameRateMonitor?.destroy();
     this._mapSourceControls?.destroy();
     this._cameraOrientationControls?.destroy();
+    this._mapViewPresets?.destroy();
     this._clearLayersControl?.destroy();
     this._locationControls?.destroy();
     this._cctvControls?.destroy();

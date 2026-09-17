@@ -16,7 +16,12 @@ import {
   _typeCctvSummary,
   _updateCctvSyncChip,
 } from './cctvPresentation.js';
-import { _initCctvPanel } from './cctvBindings.js';
+import {
+  _initCctvPanel,
+  _initCctvMaximizeControls,
+  _syncAutoMaximizeButton,
+} from './cctvBindings.js';
+import { createCctvMaximizeViewer } from './cctvMaximize.js';
 
 /** Own camera-panel interaction and presentation; receive the camera port and application actions. */
 export class CctvControls {
@@ -37,6 +42,10 @@ export class CctvControls {
     this._cctvFramePreloader = null;
     this._calibrationEdit = null;
     this._actionGeneration = 0;
+    // Penampil layar penuh dan preferensinya. Mati secara bawaan supaya alur
+    // klik yang sudah ada tidak berubah bagi operator yang tidak memintanya.
+    this._maximizeViewer = createCctvMaximizeViewer({});
+    this._autoMaximize = false;
     this._initCctvPanel();
   }
   listen(target, type, handler, options = {}) {
@@ -96,6 +105,12 @@ export class CctvControls {
   _initCctvPanel(...args) {
     return _initCctvPanel.call(this, ...args);
   }
+  _initCctvMaximizeControls(...args) {
+    return _initCctvMaximizeControls.call(this, ...args);
+  }
+  _syncAutoMaximizeButton(...args) {
+    return _syncAutoMaximizeButton.call(this, ...args);
+  }
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -104,6 +119,8 @@ export class CctvControls {
     this._cctvUnsubscribe?.();
     this._cctvUnsubscribe = null;
     this._calibrationEdit?.(false);
+    this._maximizeViewer?.destroy();
+    this._maximizeViewer = null;
     this._clearCctvFrame();
     clearInterval(this._cctvSummaryTypingTimer);
     clearTimeout(this._cctvChipHideTimer);
