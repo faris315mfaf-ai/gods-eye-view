@@ -41,8 +41,8 @@ import {
   DEFAULT_INDONESIA_SOURCE_FILE,
   INDONESIA_MAX_CATALOG_BYTES,
   INDONESIA_CAMERA_DEFAULTS,
-  CCTV_SOURCE_FETCH_TIMEOUT_MS,
 } from './constants.js';
+import { fetchCctvCatalog } from './connect.js';
 import {
   toFiniteNumber,
   isLikelyJogjaCoordinate,
@@ -176,10 +176,9 @@ export function jogjaCameraToSource(record) {
 export async function loadJogjaSourcesFromAtcs() {
   try {
     const endpoint = process.env.CCTV_JOGJA_URL || DEFAULT_JOGJA_CCTV_URL;
-    const resp = await fetch(endpoint, {
+    const resp = await fetchCctvCatalog(endpoint, {
       headers: { ...XHR, Accept: 'application/json' },
       redirect: 'manual',
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     // A response this loader will not read still owns its transport until the
     // body is released, so every rejection path cancels before returning.
@@ -307,16 +306,27 @@ export async function mapWithConcurrency(items, limit, mapper) {
 
 /** POST a form body to a Bandung ATCS ajax endpoint and read it as text. */
 async function postBandungAjax(endpoint, body) {
-  const resp = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      ...XHR,
-      'Content-Type': 'application/x-www-form-urlencoded',
+  const resp = await fetchCctvCatalog(
+    endpoint,
+    {
+      method: 'POST',
+      headers: {
+        ...XHR,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+      redirect: 'manual',
     },
-    body,
-    redirect: 'manual',
-    signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
-  });
+    {
+      // A reconnection is refused for POST by default, because a repeated POST
+      // is normally a second act. Not here: all three of these endpoints are
+      // queries -- the location list, one site's camera list, one camera's
+      // details -- and POST is merely the shape this portal's ajax API takes.
+      // Nothing on the server changes, and the body is a string, so the second
+      // attempt is the same request byte for byte rather than an empty one.
+      replayable: true,
+    },
+  );
   if (!resp.ok || (resp.status >= 300 && resp.status < 400)) {
     try {
       await resp.body?.cancel();
@@ -785,10 +795,9 @@ export async function loadJakartaSourcesFromPortal({
   try {
     const endpoint =
       process.env.CCTV_JAKARTA_PORTAL_URL || DEFAULT_JAKARTA_PORTAL_URL;
-    const resp = await fetch(endpoint, {
+    const resp = await fetchCctvCatalog(endpoint, {
       headers: { ...UA, Accept: 'text/html' },
       redirect: 'manual',
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     const discard = async () => {
       try {

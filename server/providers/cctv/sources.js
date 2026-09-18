@@ -55,8 +55,8 @@ import {
   DEFAULT_CALGARY_MAX_SOURCES,
   CALGARY_DOWNTOWN,
   CALGARY_MAX_CATALOG_BYTES,
-  CCTV_SOURCE_FETCH_TIMEOUT_MS,
 } from './constants.js';
+import { fetchCctvCatalog } from './connect.js';
 import {
   toFiniteNumber,
   extractAustinCoords,
@@ -92,9 +92,8 @@ import { readResponseJsonCapped } from '../common/http.js';
 export async function loadAustinSourcesFromOpenData() {
   const endpoint = process.env.CCTV_AUSTIN_ROWS_URL || DEFAULT_AUSTIN_ROWS_URL;
   try {
-    const resp = await fetch(endpoint, {
+    const resp = await fetchCctvCatalog(endpoint, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (!resp.ok) {
       console.warn('[CCTV] Austin source download failed:', resp.status);
@@ -204,9 +203,8 @@ export async function loadCaltransSourcesFromOpenData() {
 
   const settled = await Promise.allSettled(
     districts.map(async (district) => {
-      const resp = await fetch(CALTRANS_CCTV_URL(district), {
+      const resp = await fetchCctvCatalog(CALTRANS_CCTV_URL(district), {
         headers: { Accept: 'application/json' },
-        signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
       });
       if (!resp.ok) throw new Error(`D${district} HTTP ${resp.status}`);
       const payload = await resp.json();
@@ -319,9 +317,8 @@ export async function loadTflSourcesFromOpenData() {
     const url = appKey
       ? `${TFL_JAMCAM_URL}?app_key=${encodeURIComponent(appKey)}`
       : TFL_JAMCAM_URL;
-    const resp = await fetch(url, {
+    const resp = await fetchCctvCatalog(url, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (!resp.ok) {
       console.warn('[CCTV] TfL JamCam download failed:', resp.status);
@@ -463,9 +460,8 @@ function pickOntarioCctvView(views) {
  */
 export async function loadOntarioSourcesFromOpenData() {
   try {
-    const resp = await fetch(ONTARIO_511_CAMERAS_URL, {
+    const resp = await fetchCctvCatalog(ONTARIO_511_CAMERAS_URL, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (!resp.ok) {
       console.warn('[CCTV] Ontario 511 camera download failed:', resp.status);
@@ -579,14 +575,13 @@ export async function loadOntarioSourcesFromOpenData() {
  */
 export async function loadFintrafficSourcesFromOpenData() {
   try {
-    const resp = await fetch(FINTRAFFIC_STATIONS_URL, {
+    const resp = await fetchCctvCatalog(FINTRAFFIC_STATIONS_URL, {
       headers: {
         Accept: 'application/json',
         'Accept-Encoding': 'gzip',
         'Digitraffic-User': DIGITRAFFIC_USER,
       },
       redirect: 'manual',
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (resp.status >= 300 && resp.status < 400) {
       console.warn(
@@ -731,9 +726,8 @@ const DRIVEBC_ORIENTATION_HEADINGS = Object.freeze({
  */
 export async function loadDriveBcSourcesFromOpenData() {
   try {
-    const resp = await fetch(DRIVEBC_WEBCAMS_URL, {
+    const resp = await fetchCctvCatalog(DRIVEBC_WEBCAMS_URL, {
       headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (!resp.ok) {
       console.warn('[CCTV] DriveBC camera download failed:', resp.status);
@@ -927,12 +921,11 @@ export async function loadTxdotSourcesFromOpenData() {
 
   const settled = await Promise.allSettled(
     districts.map(async (district) => {
-      const resp = await fetch(TXDOT_CCTV_STATUS_URL(district), {
+      const resp = await fetchCctvCatalog(TXDOT_CCTV_STATUS_URL(district), {
         headers: {
           Accept: 'application/json',
           'User-Agent': 'gods-eye-view-cctv-proxy/1.0',
         },
-        signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
       });
       if (!resp.ok) throw new Error(`${district} HTTP ${resp.status}`);
       return { district, payload: await resp.json() };
@@ -1143,13 +1136,11 @@ export function parseTarkteeDatexImages(xml) {
 export async function loadTarkteeSourcesFromDatex() {
   try {
     const [locResp, imgResp] = await Promise.all([
-      fetch(TARKTEE_LOCATIONS_URL, {
+      fetchCctvCatalog(TARKTEE_LOCATIONS_URL, {
         headers: { Accept: 'application/xml,text/xml,*/*' },
-        signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
       }),
-      fetch(TARKTEE_IMAGES_URL, {
+      fetchCctvCatalog(TARKTEE_IMAGES_URL, {
         headers: { Accept: 'application/xml,text/xml,*/*' },
-        signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
       }),
     ]);
     if (!locResp.ok) {
@@ -1366,12 +1357,11 @@ export function nswCameraToSource(feature) {
  */
 export async function loadNswSourcesFromOpenData() {
   try {
-    const resp = await fetch(NSW_CAMERAS_URL, {
+    const resp = await fetchCctvCatalog(NSW_CAMERAS_URL, {
       headers: {
         Accept: 'application/json',
         'User-Agent': 'gods-eye-view-cctv-proxy/1.0',
       },
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     if (!resp.ok) {
       console.warn('[CCTV] NSW camera download failed:', resp.status);
@@ -1538,10 +1528,9 @@ export async function loadCalgarySourcesFromOpenData() {
   try {
     const endpoint =
       process.env.CCTV_CALGARY_ROWS_URL || DEFAULT_CALGARY_ROWS_URL;
-    const resp = await fetch(endpoint, {
+    const resp = await fetchCctvCatalog(endpoint, {
       headers: { Accept: 'application/json' },
       redirect: 'manual',
-      signal: AbortSignal.timeout(CCTV_SOURCE_FETCH_TIMEOUT_MS),
     });
     // A response this loader will not read still owns its transport until the
     // body is released, so every rejection path cancels before returning.

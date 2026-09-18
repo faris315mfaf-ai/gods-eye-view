@@ -322,6 +322,29 @@ export const CCTV_SOURCE_CACHE_MS = 15 * 60 * 1000;
  * pending forever — a hung fetch aborts, the loader returns [], and
  * serve-stale/other packs take over. */
 export const CCTV_SOURCE_FETCH_TIMEOUT_MS = 15 * 1000;
+
+/*
+ * Catalogs reconnect on the same reasoning as media -- see the note beside
+ * CCTV_MEDIA_ATTEMPT_TIMEOUT_MS -- with one difference that matters.
+ *
+ * A media deadline stops at the response headers, because a live video body is
+ * meant to run for minutes. A catalog deadline does not: the download has to
+ * finish, and the constant above exists precisely so a stalled portal cannot
+ * leave getCctvSources pending. So the budget below covers the body too, and
+ * two attempts still add up to the same 15 seconds a single attempt was
+ * allowed before.
+ *
+ * A failed catalog is quieter than a failed camera -- the loader returns an
+ * empty list and the previous snapshot is served on -- but the cameras in that
+ * pack vanish from the globe until the next refresh. One reconnection is worth
+ * it; more would mean leaning on a municipal server that is already busy.
+ */
+
+/** Budget for every catalog attempt but the last, body included. */
+export const CCTV_SOURCE_ATTEMPT_TIMEOUT_MS = 5 * 1000;
+
+/** Catalog connections opened before a pack is given up on for this refresh. */
+export const CCTV_SOURCE_FETCH_ATTEMPTS = 2;
 /** Individual CCTV image fetches must settle before the active 10-second
  * client refresh cadence. A bounded miss can fall through to Street View or
  * the synthetic frame instead of leaving the browser preview pending. */
