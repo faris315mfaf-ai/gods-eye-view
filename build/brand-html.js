@@ -38,6 +38,7 @@ const FALLBACK = Object.freeze({
   documentTitle: "God's Eye View",
   tagline: 'NO PLACE LEFT BEHIND',
   logo: '/logo.svg',
+  splash: '/splash.svg',
 });
 
 /** Lolos-kan teks agar aman disisipkan sebagai isi elemen HTML. */
@@ -81,6 +82,7 @@ export function loadBrand(source = new URL('../config/brand.json', import.meta.u
     documentTitle: pick('documentTitle'),
     tagline: pick('tagline'),
     logo: pick('logo'),
+    splash: pick('splash'),
   };
 }
 
@@ -152,6 +154,14 @@ export function applyBrand(html, brand) {
     const logo = escapeAttribute(brand.logo);
     const before = out;
     out = out.replace(/(["'(])\/logo\.svg(["')])/g, `$1${logo}$2`);
+    if (out !== before) applied += 1;
+  }
+
+  // Berkas layar pembuka.
+  if (brand.splash && brand.splash !== FALLBACK.splash) {
+    const splash = escapeAttribute(brand.splash);
+    const before = out;
+    out = out.replace(/(["'(])\/splash\.svg(["')])/g, `$1${splash}$2`);
     if (out !== before) applied += 1;
   }
 

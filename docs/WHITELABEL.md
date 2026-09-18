@@ -98,6 +98,7 @@ Sebagian besar yang terlihat pengguna diatur dari satu berkas:
 | `documentTitle` | Judul tab peramban dan nama pintasan |
 | `tagline` | Baris kecil di bawah judul. Isi `""` untuk menyembunyikannya |
 | `logo` | Berkas logo di `public/`. Dipakai untuk logo layar **dan** favicon |
+| `splash` | Berkas layar pembuka di `public/`. Memudar penuh dalam 5 detik |
 
 Setelah menyunting, jalankan ulang:
 
@@ -141,6 +142,63 @@ Yang perlu diperhatikan pada berkas logo:
   Bila Anda ingin efek itu, beri id `globe` pada bagian yang boleh bergerak.
 - Untuk mematikan efek kursor sepenuhnya, hapus atribut `data-logo-gaze` pada
   kedua template di Bagian 5.
+
+---
+
+## 2b. Mengganti layar pembuka (splash)
+
+Layar pembuka bawaan adalah peta Nusantara merah putih yang memudar penuh
+dalam 5 detik. Gambarnya satu berkas:
+[`public/splash.svg`](../public/splash.svg).
+
+**Cara termudah:** timpa berkas itu dengan gambar Anda, nama tetap sama.
+
+**Bila ingin nama atau format lain:** taruh di `public/`, lalu tulis namanya di
+`config/brand.json`:
+
+```json
+{ "splash": "/pembuka-saya.gif" }
+```
+
+Format apa pun bisa — SVG, PNG, JPG, GIF animasi. **Memudarnya diurus CSS,
+bukan berkas gambarnya**, jadi lima detik itu tetap berjalan sama untuk format
+apa pun. Ini juga alasan splash bawaan dibuat SVG statis, bukan GIF: animasi di
+dalam berkas gambarnya tidak diperlukan, dan SVG tetap tajam di layar mana pun
+pada ukuran 30 KB.
+
+### Mengubah durasi atau gerak memudarnya
+
+Ada di aturan `.splash-screen` dalam
+[`src/ui/styles/foundation.css`](../src/ui/styles/foundation.css):
+
+```css
+animation: splash-fade 5s cubic-bezier(0.37, 0, 0.28, 1) forwards;
+```
+
+Angka `5s` adalah durasinya. `cubic-bezier` adalah kurva geraknya — nilai itu
+dipilih agar memudarnya terasa halus sejak awal, bukan jatuh mendadak di akhir.
+
+Satu hal yang perlu diketahui: bagi pengguna yang menyalakan **"kurangi gerak"**
+di setelan sistemnya, durasinya otomatis menjadi 0,6 detik. Itu disengaja dan
+sebaiknya dibiarkan.
+
+### Membangun ulang peta bawaan
+
+Peta Nusantara itu dibangkitkan dari data Natural Earth (domain publik) yang
+sudah ada di repositori, bukan digambar tangan:
+
+```bash
+node scripts/build-splash-map.mjs
+```
+
+Jalankan bila Anda ingin mengubah pulau yang digambar, warnanya, atau
+bingkainya — semuanya diatur di bagian atas berkas skrip tersebut.
+
+> **Catatan batas wilayah.** Papua dipotong tepat di 141°BT, yang memang batas
+> sesungguhnya dengan Papua Nugini. Batas Kalimantan dengan Malaysia
+> **didekatkan dengan dua garis lurus**, karena batas aslinya berkelok
+> mengikuti punggung pegunungan dan tidak tersedia di data ini. Cukup benar
+> untuk sebuah siluet, tetapi jangan dipakai sebagai rujukan batas resmi.
 
 ---
 
@@ -258,6 +316,8 @@ tersebut di fork Anda.
 | --- | --- |
 | Nama, tagline, judul tab, logo | `config/brand.json` |
 | Berkas logo | `public/logo.svg` |
+| Layar pembuka | `public/splash.svg` |
+| Durasi memudar splash | `.splash-screen` di `src/ui/styles/foundation.css` |
 | Kata-kata antarmuka | `src/ui/i18n/id.json` |
 | Label tombol panel CCTV | `src/ui/cctvPresentation.js` |
 | Identitas ke API publik | `server/providers/` |

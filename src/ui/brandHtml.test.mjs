@@ -11,6 +11,7 @@ const DEFAULTS = {
   documentTitle: "God's Eye View",
   tagline: 'NO PLACE LEFT BEHIND',
   logo: '/logo.svg',
+  splash: '/splash.svg',
 };
 
 const custom = (over = {}) => ({ ...DEFAULTS, ...over });
@@ -104,15 +105,30 @@ test('loadBrand keeps a deliberately empty string rather than filling it in', ()
   }
 });
 
-test('the shipped brand file still produces the stock build', () => {
-  // The repository ships with the original identity; whitelabelling is opt-in.
+test('the build renders whatever brand file is currently shipped', () => {
+  // Asserted against the ACTIVE brand file rather than one fixed name: pinning
+  // a name here would fail every time someone rebrands, which is the normal
+  // use of this system, not a regression.
   const source = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
   const html = buildApplicationHtml(source);
-  assert.match(html, /<title>God&#39;s Eye View<\/title>|<title>God's Eye View<\/title>/);
-  assert.ok(html.includes("GOD'S EYE"));
-  // The Indonesian dictionary still owns the tagline, because the brand file
-  // has not overridden it.
-  assert.ok(html.includes('TAK ADA TEMPAT YANG TERLEWAT'));
+  const brand = loadBrand();
+
+  const rawTitle = /<title>([\s\S]*?)<\/title>/.exec(html)?.[1] ?? '';
+  const title = rawTitle.replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  assert.equal(title, brand.documentTitle, 'tab title follows the brand file');
+
+  const onScreen =
+    /data-brand="name"[^>]*>([\s\S]*?)<\/span><\/span>/.exec(html)?.[1] ?? '';
+  assert.ok(
+    onScreen.includes(brand.name),
+    `on-screen title should carry ${brand.name}, got: ${onScreen}`,
+  );
+  if (brand.nameAccent) {
+    assert.ok(
+      onScreen.includes(brand.nameAccent),
+      'the accent half of the name should render too',
+    );
+  }
 });
 
 test('the shipped brand file parses and carries every key', () => {
