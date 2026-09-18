@@ -335,7 +335,50 @@ export const CCTV_FRAME_MAX_BODY_BYTES = 16 * 1024 * 1024;
  * full because every URI in it has to be rewritten before the player sees it. */
 export const CCTV_PLAYLIST_MAX_BYTES = 2 * 1024 * 1024;
 
-/** Deadline for upstream response headers; live bodies keep streaming afterward. */
+/** Deadline for upstream response headers; live bodies keep streaming afterward.
+ * This is the budget for the whole attempt sequence, not for one connection. */
 export const CCTV_MEDIA_FETCH_TIMEOUT_MS = 15 * 1000;
+
+/*
+ * Why the media fetch retries, and why each attempt is cut short
+ * -------------------------------------------------------------
+ * Some of the camera portals drop inbound SYN packets under load. A dropped
+ * SYN is not reported to the client; the kernel simply retransmits on a fixed
+ * ladder, so the connection completes after 1s, then 3s, then 7s, then 15s.
+ * Measured against cctvjss.jogjakota.go.id, connect latency was 24-90ms in the
+ * median case and landed on exactly those ladder steps otherwise -- the same
+ * host, seconds apart, with no failure in between.
+ *
+ * That shape is what makes a single long wait the wrong answer. Sitting on a
+ * connection that has already missed the first rung buys a 3s, 7s or 15s
+ * answer, while a fresh SYN opened alongside it usually lands in well under a
+ * tenth of a second. So each attempt is given a budget just past the 3s rung
+ * and then abandoned in favour of a new one.
+ *
+ * The undici default made this worse than it had to be: it gives up at 10s,
+ * which falls between the 7s and 15s rungs. A camera whose SYN was dropped
+ * three times spent ten seconds failing, and the viewer saw 502 on a camera
+ * that was working.
+ */
+
+/*
+ * The first attempt is impatient; the last one is patient.
+ *
+ * Only the earlier attempts are held to the budget below -- the final attempt
+ * runs to whatever is left of the total. That split is deliberate. Cutting
+ * every attempt short would break a camera that is slow for an honest reason:
+ * one that consistently needs eight seconds to answer would be abandoned three
+ * times and reported as a failure, having previously worked. Leaving the last
+ * attempt the remaining ten seconds keeps that camera working, while the short
+ * first attempt still converts a dropped SYN into a fresh connection instead of
+ * a ten-second wait.
+ */
+
+/** Budget for every attempt but the last: past the 3s SYN rung, short of 7s. */
+export const CCTV_MEDIA_ATTEMPT_TIMEOUT_MS = 5 * 1000;
+
+/** Connections opened before giving up. Two independent SYNs carry almost
+ * every case; a third would only shorten the patient final attempt. */
+export const CCTV_MEDIA_FETCH_ATTEMPTS = 2;
 /** Declared size ceiling for fixed media responses. */
 export const CCTV_MEDIA_MAX_BODY_BYTES = 64 * 1024 * 1024;

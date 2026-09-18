@@ -1,4 +1,4 @@
-import { CCTV_FRAME_FETCH_TIMEOUT_MS, CCTV_FRAME_MAX_BODY_BYTES, CCTV_MEDIA_FETCH_TIMEOUT_MS, CCTV_MEDIA_MAX_BODY_BYTES } from '../../server/providers/cctv/constants.js';
+import { CCTV_FRAME_FETCH_TIMEOUT_MS, CCTV_FRAME_MAX_BODY_BYTES, CCTV_MEDIA_ATTEMPT_TIMEOUT_MS, CCTV_MEDIA_FETCH_ATTEMPTS, CCTV_MEDIA_FETCH_TIMEOUT_MS, CCTV_MEDIA_MAX_BODY_BYTES } from '../../server/providers/cctv/constants.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -258,4 +258,233 @@ test('rejected snapshot responses abort the upstream download', async () => {
     assert.equal(result, null);
     assert.equal(signal.aborted, true);
   }
+});
+
+/* --------------------------------------------------------------------------
+ * Reopening a connection that never answered
+ *
+ * The camera portals drop SYN packets under load. The kernel then retransmits
+ * on a fixed ladder, so a connection that missed the first rung answers after
+ * 1s, 3s, 7s or 15s -- while a fresh connection opened alongside it typically
+ * lands in tens of milliseconds. These tests pin the behaviour that turns a
+ * dropped packet into a reopened connection instead of a 502 on a live camera.
+ * ----------------------------------------------------------------------- */
+
+/** A fetch stub that fails the first `failures` calls the way a dead connection does. */
+function flakyFetch(failures, { code = 'UND_ERR_CONNECT_TIMEOUT' } = {}) {
+  const calls = [];
+  const impl = async (url, init) => {
+    calls.push(init);
+    if (calls.length <= failures) {
+      throw Object.assign(new TypeError('fetch failed'), {
+        cause: Object.assign(new Error('Connect Timeout Error'), { code }),
+      });
+    }
+    return { ok: true, status: 200, headers: new Map(), body: null };
+  };
+  return { impl, calls };
+}
+
+test('a connection that never answered is reopened, not reported as a failure', async () => {
+  const { impl, calls } = flakyFetch(2);
+  const upstream = await fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+    fetchImpl: impl,
+    attempts: 3,
+    attemptTimeoutMs: 50,
+    timeoutMs: 1000,
+  });
+  assert.equal(upstream.ok, true, 'the third connection carried the stream');
+  assert.equal(calls.length, 3, 'two dead connections were reopened');
+});
+
+test('each attempt is opened with its own signal, so one expiry cannot cancel the next', async () => {
+  const { impl, calls } = flakyFetch(1);
+  await fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+    fetchImpl: impl,
+    attempts: 2,
+    attemptTimeoutMs: 50,
+    timeoutMs: 1000,
+  });
+  assert.equal(calls.length, 2);
+  assert.notEqual(calls[0].signal, calls[1].signal, 'a reused signal would arrive already aborted');
+  assert.equal(calls[1].signal.aborted, false, 'the surviving attempt is not aborted');
+});
+
+test('attempts stop at the configured count and surface the last failure', async () => {
+  const { impl, calls } = flakyFetch(Infinity);
+  await assert.rejects(
+    fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+      fetchImpl: impl,
+      attempts: 3,
+      attemptTimeoutMs: 20,
+      timeoutMs: 1000,
+    }),
+    (error) => error instanceof TypeError,
+    'the caller sees the transport failure, not a synthesised one',
+  );
+  assert.equal(calls.length, 3, 'a camera that is genuinely down is not hammered');
+});
+
+test('a viewer who left is never retried', async () => {
+  // Reopening here would pull video from a government portal for a browser
+  // tab that is already closed -- the one retry that costs bandwidth and
+  // buys nothing.
+  const downstream = new AbortController();
+  downstream.abort();
+  const { impl, calls } = flakyFetch(Infinity);
+  await assert.rejects(
+    fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+      fetchImpl: impl,
+      attempts: 3,
+      attemptTimeoutMs: 50,
+      timeoutMs: 1000,
+      signal: downstream.signal,
+    }),
+  );
+  assert.equal(calls.length, 1, 'exactly one attempt for a viewer who is gone');
+});
+
+test('a viewer leaving mid-request stops the sequence there', async () => {
+  const downstream = new AbortController();
+  let calls = 0;
+  await assert.rejects(
+    fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+      attempts: 3,
+      attemptTimeoutMs: 500,
+      timeoutMs: 5000,
+      signal: downstream.signal,
+      fetchImpl: (url, { signal }) => new Promise((resolve, reject) => {
+        calls += 1;
+        setTimeout(() => downstream.abort(), 10);
+        signal.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+      }),
+    }),
+  );
+  assert.equal(calls, 1, 'the departure ends the sequence rather than starting another attempt');
+});
+
+test('an attempt is cut at its own budget, well before the total deadline', async () => {
+  // Without the per-attempt budget the first connection would hold the whole
+  // 15 seconds and there would be no second connection at all.
+  const started = [];
+  const finished = [];
+  const upstream = await fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+    attempts: 2,
+    attemptTimeoutMs: 40,
+    timeoutMs: 4000,
+    fetchImpl: (url, { signal }) => new Promise((resolve, reject) => {
+      const index = started.length;
+      started.push(Date.now());
+      if (index === 0) {
+        // A connection that never answers, like a dropped SYN.
+        signal.addEventListener('abort', () => {
+          finished.push(Date.now());
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+        });
+        return;
+      }
+      resolve({ ok: true, status: 200, headers: new Map(), body: null });
+    }),
+  });
+  assert.equal(upstream.ok, true);
+  assert.equal(started.length, 2, 'the silent connection was abandoned in favour of a new one');
+  const firstAttemptMs = finished[0] - started[0];
+  assert.ok(firstAttemptMs < 2000, `the first attempt lasted ${firstAttemptMs}ms, not the full deadline`);
+});
+
+test('the total deadline outranks the attempt count', async () => {
+  // Three attempts must never add up to three times the promise made to the
+  // caller; the route's 504 is a deadline, not a suggestion.
+  const startedAt = Date.now();
+  let calls = 0;
+  await assert.rejects(
+    fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+      attempts: 5,
+      attemptTimeoutMs: 60,
+      timeoutMs: 150,
+      fetchImpl: (url, { signal }) => new Promise((resolve, reject) => {
+        calls += 1;
+        signal.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+      }),
+    }),
+  );
+  const elapsed = Date.now() - startedAt;
+  assert.ok(elapsed < 600, `honoured the 150ms total budget, took ${elapsed}ms`);
+  assert.ok(calls >= 2 && calls <= 5, `attempted within the budget, made ${calls}`);
+});
+
+test('the last attempt may use the whole remaining budget', async () => {
+  // A camera that connects slowly but does connect should not be cut off by
+  // the attempt budget once there is nothing left to retry with.
+  let calls = 0;
+  const upstream = await fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+    attempts: 2,
+    attemptTimeoutMs: 30,
+    timeoutMs: 3000,
+    fetchImpl: (url, { signal }) => new Promise((resolve, reject) => {
+      calls += 1;
+      if (calls === 1) {
+        signal.addEventListener('abort', () =>
+          reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+        return;
+      }
+      // Answers after the 30ms attempt budget but inside the 3s total.
+      setTimeout(() => resolve({ ok: true, status: 200, headers: new Map(), body: null }), 120);
+    }),
+  });
+  assert.equal(upstream.ok, true, 'the final attempt was allowed to run to the total deadline');
+});
+
+test('a camera that is honestly slow still connects, it is not retried to death', async () => {
+  // The regression this guards against. Cutting EVERY attempt to the short
+  // budget would abandon a camera that consistently needs eight seconds to
+  // answer -- a camera that worked before this change. Only the earlier
+  // attempts are impatient; the last one gets what remains.
+  let calls = 0;
+  const upstream = await fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+    attempts: CCTV_MEDIA_FETCH_ATTEMPTS,
+    attemptTimeoutMs: 40,
+    timeoutMs: 2000,
+    fetchImpl: (url, { signal }) => new Promise((resolve, reject) => {
+      calls += 1;
+      signal.addEventListener('abort', () =>
+        reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+      // Always slower than the attempt budget, always inside the total.
+      setTimeout(() => resolve({ ok: true, status: 200, headers: new Map(), body: null }), 160);
+    }),
+  });
+  assert.equal(upstream.ok, true, 'the patient final attempt carried the slow camera');
+  assert.equal(calls, CCTV_MEDIA_FETCH_ATTEMPTS, 'it took the whole sequence, and the sequence delivered');
+});
+
+test('the shipped budgets fit inside the deadline the route promises', async () => {
+  const impatient = (CCTV_MEDIA_FETCH_ATTEMPTS - 1) * CCTV_MEDIA_ATTEMPT_TIMEOUT_MS;
+  const patient = CCTV_MEDIA_FETCH_TIMEOUT_MS - impatient;
+  assert.ok(
+    patient >= CCTV_MEDIA_ATTEMPT_TIMEOUT_MS,
+    `the final attempt is left ${patient}ms, which must not be under the ${CCTV_MEDIA_ATTEMPT_TIMEOUT_MS}ms every other attempt gets`,
+  );
+  // Past the 3s SYN rung, short of the 7s one. Below 3s the ladder's second
+  // rung is abandoned needlessly; at 7s or beyond a dropped SYN costs more
+  // than reopening does.
+  assert.ok(CCTV_MEDIA_ATTEMPT_TIMEOUT_MS > 3200, 'must clear the 3s SYN retransmission rung');
+  assert.ok(CCTV_MEDIA_ATTEMPT_TIMEOUT_MS < 7000, 'must not sit through the 7s rung');
+  assert.ok(CCTV_MEDIA_FETCH_ATTEMPTS >= 2, 'one attempt is the bug this fixes');
+  // The total is what the route promises the browser; retrying must not
+  // quietly turn 15 seconds into 30.
+  assert.ok(CCTV_MEDIA_FETCH_TIMEOUT_MS >= 10_000, 'production keeps a generous total deadline');
+});
+
+test('a single attempt is still honoured when asked for', async () => {
+  const { impl, calls } = flakyFetch(Infinity);
+  await assert.rejects(
+    fetchCctvMediaUpstream('https://example.com/stream.m3u8', {
+      fetchImpl: impl,
+      attempts: 1,
+      timeoutMs: 200,
+    }),
+  );
+  assert.equal(calls.length, 1);
 });

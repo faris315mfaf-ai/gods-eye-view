@@ -3,6 +3,8 @@ import { hashSeed, escapeXml } from './normalize.js';
 import {
   CCTV_FRAME_FETCH_TIMEOUT_MS,
   CCTV_FRAME_MAX_BODY_BYTES,
+  CCTV_MEDIA_ATTEMPT_TIMEOUT_MS,
+  CCTV_MEDIA_FETCH_ATTEMPTS,
   CCTV_MEDIA_FETCH_TIMEOUT_MS,
   CCTV_MEDIA_MAX_BODY_BYTES,
   NSW_IMAGE_ORIGIN,
@@ -278,29 +280,79 @@ async function readCappedResponseBytes(upstream, maxBytes) {
   }
 }
 
-/** Open registered media within a header deadline; leave timely live bodies running. */
+/**
+ * Open registered media within a header deadline; leave timely live bodies
+ * running.
+ *
+ * A connection that never answers is reopened rather than waited on. The
+ * portals this proxy talks to drop SYN packets under load, and a dropped SYN
+ * costs seconds of silence while a fresh one usually connects immediately --
+ * see the reasoning beside CCTV_MEDIA_ATTEMPT_TIMEOUT_MS. Retrying is safe
+ * here because these are GET requests and an attempt only retries when it
+ * produced no response headers, so nothing has been written downstream.
+ */
 export async function fetchCctvMediaUpstream(
   url,
   {
     headers = {},
     fetchImpl = fetch,
     timeoutMs = CCTV_MEDIA_FETCH_TIMEOUT_MS,
+    attemptTimeoutMs = CCTV_MEDIA_ATTEMPT_TIMEOUT_MS,
+    attempts = CCTV_MEDIA_FETCH_ATTEMPTS,
     signal: downstream = null,
   } = {},
 ) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  // The client going away cancels the upstream request, not just the response
-  // to it.
-  const onDownstreamAbort = () => controller.abort();
-  if (downstream?.aborted) controller.abort();
-  else downstream?.addEventListener?.('abort', onDownstreamAbort);
-  try {
-    return await fetchImpl(url, { headers, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-    downstream?.removeEventListener?.('abort', onDownstreamAbort);
+  const deadline = Date.now() + timeoutMs;
+  const maxAttempts = Math.max(1, Math.floor(attempts) || 1);
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const remaining = deadline - Date.now();
+    // The total deadline is the promise made to the caller; an attempt that
+    // cannot start inside it is not started.
+    if (remaining <= 0) break;
+    // Earlier attempts are cut short so there is room left to open another
+    // connection; the last one may use whatever remains.
+    const budget =
+      attempt === maxAttempts
+        ? remaining
+        : Math.min(attemptTimeoutMs, remaining);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), budget);
+    // The client going away cancels the upstream request, not just the
+    // response to it -- and unlike an expired attempt, it is never retried,
+    // because there is nobody left to answer.
+    let abandoned = Boolean(downstream?.aborted);
+    const onDownstreamAbort = () => {
+      abandoned = true;
+      controller.abort();
+    };
+    if (abandoned) controller.abort();
+    else downstream?.addEventListener?.('abort', onDownstreamAbort);
+
+    try {
+      return await fetchImpl(url, { headers, signal: controller.signal });
+    } catch (error) {
+      lastError = error;
+      if (abandoned) throw error;
+      // Otherwise fall through and reopen. No distinction is drawn between a
+      // silent connection and a refused or reset one: both failed before any
+      // header arrived, and both are worth a fresh connection.
+    } finally {
+      // Cleared at header arrival too, so a live body keeps flowing past the
+      // deadline that bounded opening it.
+      clearTimeout(timeoutId);
+      downstream?.removeEventListener?.('abort', onDownstreamAbort);
+    }
   }
+
+  throw (
+    lastError ||
+    Object.assign(new Error('Media fetch deadline elapsed'), {
+      name: 'TimeoutError',
+    })
+  );
 }
 
 /**

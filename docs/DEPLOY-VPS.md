@@ -266,6 +266,7 @@ Dari peramban, buka domain Anda dan periksa tiga hal:
 | Halaman kosong, tak ada globe | `npm run build` belum dijalankan, atau gagal kehabisan RAM |
 | Globe jalan, kamera kosong | Layanan tidak hidup — periksa `journalctl -u mata` |
 | Kamera ada, video tidak jalan | Portal sumbernya sedang mati, atau IP server Anda diblokir portal itu |
+| Kamera kadang gagal, kadang jalan, kamera yang sama | Portal itu membuang paket SYN saat sedang sibuk; lihat Bagian 9.1 |
 | Layanan mati sendiri lalu hidup | Kehabisan RAM; naikkan RAM atau tambahkan swap |
 
 Memeriksa apakah portal sumbernya yang bermasalah, bukan server Anda:
@@ -273,6 +274,27 @@ Memeriksa apakah portal sumbernya yang bermasalah, bukan server Anda:
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" https://cctvjss.jogjakota.go.id/atcs/ATCS_pkumuh.stream/playlist.m3u8
 ```
+
+### 9.1 Kamera yang gagalnya berpindah-pindah
+
+Gejalanya khas: kamera yang sama kadang tampil, kadang menjawab 502, lalu
+tampil lagi tanpa ada yang diubah. Itu **bukan** kamera yang mati, dan bukan
+pula IP Anda yang diblokir.
+
+Sebagian portal membuang paket SYN ketika sedang padat. Paket yang dibuang
+tidak dilaporkan kepada siapa pun -- kernel diam-diam mengirim ulang menurut
+tangga tetap, sehingga sambungan baru jadi setelah 1 detik, lalu 3, lalu 7,
+lalu 15. Pengukuran ke `cctvjss.jogjakota.go.id` menunjukkan sambungan biasanya
+jadi dalam 24-90 milidetik, dan sisanya mendarat tepat di anak tangga itu.
+
+Aplikasi ini sudah menanganinya: sambungan yang tidak menjawab dalam 5 detik
+ditinggalkan, lalu dibuka sambungan baru -- yang umumnya tersambung seketika.
+Jadi bila gejala ini muncul sesekali, tidak ada yang perlu Anda lakukan.
+
+Yang perlu diperiksa hanya bila gejalanya **terus-menerus**. Itu tandanya beban
+yang Anda kirim ke portal itu memang berlebihan, dan jawabannya adalah
+menurunkan jumlah kamera lewat `CCTV_*_MAX_SOURCES` (lihat Bagian 0.2), bukan
+menaikkan batas waktunya.
 
 ---
 
