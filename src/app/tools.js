@@ -3,6 +3,8 @@ import { initAnnotations } from '../annotations/index.js';
 import { initDrawTool } from '../annotations/drawTool.js';
 import { initGevVoiceCommands } from '../voice/gevRealtime.js';
 import { installScopeMask, destroyScopeMask } from '../scopeMask.js';
+import { installSplashOverlay } from '../ui/splashOverlay.js';
+import splashBounds from '../../config/splash-bounds.json';
 import {
   installRenderGovernor,
   getRenderGovernorDiagnostics,
@@ -55,6 +57,20 @@ export function createApplicationTools({
   // Install the explicit scope mask used by the DISPLAY controls.
   installScopeMask(viewer);
   defer(() => destroyScopeMask());
+
+  // Layar pembuka: peta Nusantara merah putih yang menempel pada globe lalu
+  // memudar menyingkap garis pantai di bawahnya. Dipasang di sini karena butuh
+  // viewer yang sudah jadi, dan sebelum pengatur render agar frame pertamanya
+  // tidak tertahan.
+  const splash = installSplashOverlay({
+    viewer,
+    imageUrl: '/splash.png',
+    bounds: splashBounds,
+    reducedMotion:
+      globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ===
+      true,
+  });
+  defer(() => splash.destroy());
 
   // The follow camera recomputes the tracked target's dead-reckon position
   // every frame — tracking anything is a per-frame animation. (perf wave 2)

@@ -213,18 +213,18 @@ maxLon += PAD;
 minLat -= PAD;
 maxLat += PAD;
 
-// Equirectangular, dengan bujur diperkecil sesuai lintang tengah supaya
-// proporsinya tidak melar — Nusantara membentang di khatulistiwa, jadi
-// koreksinya kecil tetapi tetap terlihat pada Papua.
-const midLat = (minLat + maxLat) / 2;
-const lonScale = Math.cos((midLat * Math.PI) / 180);
+// Equirectangular MURNI — bujur dan lintang dipetakan lurus, tanpa koreksi
+// cos(lintang). Itu wajib: berkas ini dipasang di globe sebagai Rectangle
+// bujur/lintang (lihat src/ui/splashOverlay.js), dan koreksi apa pun akan
+// menggeser gambarnya dari garis pantai di bawahnya. Nusantara berada di
+// khatulistiwa, jadi melarnya hanya 0,08% dan tidak kasat mata.
 const WIDTH = 1600;
-const spanLon = (maxLon - minLon) * lonScale;
+const spanLon = maxLon - minLon;
 const spanLat = maxLat - minLat;
 const HEIGHT = Math.round((WIDTH * spanLat) / spanLon);
 
 const project = ([lon, lat]) => [
-  ((lon - minLon) * lonScale * WIDTH) / spanLon,
+  ((lon - minLon) * WIDTH) / spanLon,
   ((maxLat - lat) * HEIGHT) / spanLat,
 ];
 
@@ -241,7 +241,7 @@ const paths = rings
   })
   .join('');
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="Peta Indonesia">
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" role="img" aria-label="Peta Indonesia">
   <title>Peta Indonesia</title>
   <defs>
     <!-- Merah di atas, putih di bawah: warna Sang Saka. Merahnya #CE1126,
@@ -266,3 +266,40 @@ console.log(`  cincin    : ${rings.length}`);
 console.log(`  ukuran    : ${WIDTH}x${HEIGHT}`);
 console.log(`  bingkai   : ${round(minLon)}..${round(maxLon)} BT, ${round(minLat)}..${round(maxLat)} LU`);
 console.log(`  berkas    : ${(svg.length / 1024).toFixed(1)} KB`);
+
+// Bingkai geografisnya ikut ditulis, supaya kode yang menempelkan gambar ini ke
+// globe tidak perlu menebak — dan supaya keduanya tidak bisa lepas sinkron.
+const boundsPath = path.join(ROOT, 'config/splash-bounds.json');
+fs.writeFileSync(
+  boundsPath,
+  `${JSON.stringify(
+    {
+      _readme:
+        'Bingkai geografis public/splash.svg, ditulis oleh scripts/build-splash-map.mjs. Dipakai src/ui/splashOverlay.js untuk menempelkan gambar itu tepat di atas Nusantara pada globe. Bila Anda mengganti splash.svg dengan gambar sendiri yang bingkainya berbeda, sesuaikan angka di sini agar tetap pas.',
+      west: Number(minLon.toFixed(4)),
+      south: Number(minLat.toFixed(4)),
+      east: Number(maxLon.toFixed(4)),
+      north: Number(maxLat.toFixed(4)),
+    },
+    null,
+    2,
+  )}\n`,
+);
+console.log(`  bingkai   : ${path.relative(ROOT, boundsPath)}`);
+
+/*
+ * Versi PNG, untuk dipasang di globe.
+ *
+ * SVG-nya tetap ditulis karena itu sumber yang bisa disunting, tetapi TIDAK
+ * dapat dipakai sebagai tekstur: Cesium mengunggah gambar lapisan citra ke
+ * WebGL lewat createImageBitmap, dan peramban menolak mendekode SVG di jalur
+ * itu ("The source image could not be decoded"). PNG yang dirender dari SVG
+ * yang sama menyelesaikannya tanpa mengubah apa pun yang terlihat.
+ */
+const pngPath = path.join(ROOT, 'public/splash.png');
+const sharp = (await import('sharp')).default;
+await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(pngPath);
+const pngBytes = fs.statSync(pngPath).size;
+console.log(
+  `  tekstur   : ${path.relative(ROOT, pngPath)} (${(pngBytes / 1024).toFixed(1)} KB)`,
+);

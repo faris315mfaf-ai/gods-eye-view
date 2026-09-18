@@ -80,3 +80,47 @@ export function flyToAustin(viewer) {
     if (!viewer.isDestroyed()) viewer.camera.cancelFlight();
   };
 }
+
+/**
+ * Titik pandang pembuka: seluruh Nusantara dalam satu bingkai.
+ *
+ * Ketinggian dipilih agar bentangan Sabang–Merauke (sekitar 47° bujur, ±5.200
+ * km) terisi penuh tanpa terpotong, dan kemiringannya tegak lurus supaya peta
+ * pembuka yang menempel di globe jatuh persis di atas garis pantainya.
+ */
+export const INDONESIA_VIEW = Object.freeze({
+  lon: 118.0,
+  lat: -2.2,
+  heightM: 6200000,
+  headingDeg: 0,
+  pitchDeg: -90,
+});
+
+/**
+ * Tempatkan kamera pada Nusantara saat aplikasi dibuka.
+ *
+ * Berbeda dengan `flyToAustin`, ini TIDAK menerbangkan kamera: ia langsung
+ * menempatkannya. Layar pembuka menempel pada globe, jadi penerbangan masuk
+ * akan menggeser peta merah putih itu dari tempatnya selama lima detik pertama
+ * — persis detik-detik saat ia seharusnya diam pas di atas Nusantara.
+ *
+ * @param {Cesium.Viewer} viewer
+ * @returns {Function} Pembatal, agar bentuknya sama dengan flyToAustin.
+ */
+export function flyToIndonesia(viewer) {
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(
+      INDONESIA_VIEW.lon,
+      INDONESIA_VIEW.lat,
+      INDONESIA_VIEW.heightM,
+    ),
+    orientation: {
+      heading: Cesium.Math.toRadians(INDONESIA_VIEW.headingDeg),
+      pitch: Cesium.Math.toRadians(INDONESIA_VIEW.pitchDeg),
+      roll: 0.0,
+    },
+  });
+  return () => {
+    if (!viewer.isDestroyed()) viewer.camera.cancelFlight();
+  };
+}

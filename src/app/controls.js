@@ -1,6 +1,6 @@
 import { catalogControlServices } from './catalog.js';
 import { StyleManager } from '../ui/composition.js';
-import { flyToAustin } from '../camera.js';
+import { flyToIndonesia } from '../camera.js';
 import { initCockpitCloudEffects } from '../cockpitCloudEffects.js';
 
 /** Construct the existing controls and camera presentation. */
@@ -39,10 +39,10 @@ export function createApplicationControls({
   });
   defer(() => cockpitCloudEffects?.destroy());
 
-  // If no share link state, do default fly-to Austin
+  // Tanpa state dari tautan berbagi, buka pada Nusantara.
   if (!styleManager.hasShareState) {
-    loaderStatus.textContent = 'Terbang ke Austin, TX...';
-    defer(flyToAustin(viewer));
+    loaderStatus.textContent = 'Menuju Nusantara...';
+    defer(flyToIndonesia(viewer));
   } else {
     loaderStatus.textContent = 'Memulihkan tampilan yang dibagikan...';
   }

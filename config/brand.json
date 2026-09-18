@@ -10,6 +10,6 @@
   "_tagline": "Baris kecil di bawah judul. Kosongkan (\"\") untuk menyembunyikannya.",
   "logo": "/logo.svg",
   "_logo": "Berkas logo di folder public/. Dipakai untuk logo di layar sekaligus favicon. Ganti isi public/logo.svg, atau taruh berkas lain di public/ lalu tulis namanya di sini.",
-  "splash": "/splash.svg",
-  "_splash": "Berkas layar pembuka di folder public/. Ganti isi public/splash.svg dengan gambar Anda (SVG, PNG, atau GIF), atau taruh berkas lain di public/ lalu tulis namanya di sini. Durasi memudarnya 5 detik dan diatur CSS, jadi berlaku untuk format apa pun."
+  "splash": "/splash.png",
+  "_splash": "Berkas layar pembuka di folder public/, ditempelkan pada globe di atas Nusantara. Harus berupa PNG atau JPG: Cesium mengunggahnya sebagai tekstur WebGL, dan SVG ditolak di jalur itu. public/splash.svg disertakan sebagai sumber yang bisa disunting, dan scripts/build-splash-map.mjs merender PNG-nya dari situ."
 }
