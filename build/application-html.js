@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { loadIndonesianDictionary, translateHtml } from './i18n-html.js';
+import { applyBrand, loadBrand } from './brand-html.js';
 
 export const APPLICATION_TEMPLATES = Object.freeze([
   'scene-chrome',
@@ -43,7 +44,10 @@ export function buildApplicationHtml(html) {
     expanded,
     loadIndonesianDictionary(),
   );
-  return translated;
+  // Merek berjalan PALING AKHIR: nama dan tagline yang dituliskan operator
+  // adalah miliknya, dan tidak boleh diterjemahkan ulang oleh kamus.
+  const { html: branded } = applyBrand(translated, loadBrand());
+  return branded;
 }
 
 /** Assemble static application markup before Vite processes scripts and assets. */
