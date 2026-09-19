@@ -6,6 +6,10 @@ domain.
 Baca **[Bagian 0](#0-yang-perlu-diketahui-sebelum-mulai)** lebih dulu — ada tiga
 hal yang lebih baik diketahui sebelum server menyala, bukan sesudah.
 
+> Lebih suka Docker? Lihat
+> [DOCKER-PRI-NUSANTARA.md](DOCKER-PRI-NUSANTARA.md), yang menjalankan hal yang
+> sama sebagai satu kontainer dan memuat langkah khusus VPS Hostinger.
+
 ---
 
 ## 0. Yang perlu diketahui sebelum mulai
