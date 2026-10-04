@@ -26,7 +26,12 @@
   "vite-build": {
     "runtime": "node",
     "exports": ["./build/vite", "./build/html"],
-    "modules": ["build/vite.js", "build/application-html.js"],
+    "modules": [
+      "build/vite.js",
+      "build/application-html.js",
+      "build/i18n-html.js",
+      "build/brand-html.js"
+    ],
     "external": ["vite-plugin-cesium"]
   },
   "live-providers": {
@@ -162,12 +167,16 @@
       "server/providers/cctv/sources.js",
       "server/providers/common/http.js",
       "src/data/directionText.js",
+      "src/data/directionTextIndonesian.js",
       "server/providers/common/geo.js",
       "server/providers/places/google-key.js",
       "scripts/google-server-key.mjs",
       "src/data/cctvFootprint.js",
       "src/sources/cctvTypes.js",
-      "src/sources/httpBody.js"
+      "src/sources/httpBody.js",
+      "server/providers/cctv/sources.indonesia.js",
+      "server/providers/cctv/hls.js",
+      "server/providers/cctv/connect.js"
     ],
     "external": []
   },
@@ -408,9 +417,13 @@
       "src/ui/cctvCalibration.js",
       "src/ui/cctvControls.js",
       "src/ui/cctvFrames.js",
-      "src/ui/cctvPresentation.js"
+      "src/ui/cctvPresentation.js",
+      "src/ui/cctvWall.js",
+      "src/ui/cctvMaximize.js",
+      "src/layers/cctv/hlsPlayback.js",
+      "src/ui/cctvMedia.js"
     ],
-    "external": []
+    "external": ["hls.js"]
   },
   "context-controls": {
     "exports": ["./ui/context", "./ui/context/policy"],
@@ -569,9 +582,16 @@
       "src/ui/visualPresets.js",
       "src/ui/visualSettings.js",
       "src/worldFocus.js",
-      "src/data/feedState.js"
+      "src/data/feedState.js",
+      "src/ui/mapViewPresets.js",
+      "src/renderGovernor.js",
+      "src/ui/keyboardFlight.js",
+      "src/ui/cctvWall.js",
+      "src/layers/cctv/hlsPlayback.js",
+      "src/ui/cctvMedia.js",
+      "src/ui/cctvMaximize.js"
     ],
-    "external": ["cesium"]
+    "external": ["cesium", "hls.js"]
   },
   "ui-styles": {
     "exports": ["./ui/styles"],
@@ -959,9 +979,10 @@
       "src/overlays/worldOverlayTokens.js",
       "src/data/cctvFootprint.js",
       "src/data/inputOwnership.js",
-      "src/layers/cctv/sourcePolicy.js"
+      "src/layers/cctv/sourcePolicy.js",
+      "src/layers/cctv/hlsPlayback.js"
     ],
-    "external": ["cesium"]
+    "external": ["cesium", "hls.js"]
   },
   "alpr-cameras": {
     "exports": ["./layers/alpr"],
@@ -1638,7 +1659,15 @@
       "src/search/nominatim.js",
       "src/nominatimGeocode.js",
       "src/sources/httpBody.js",
-      "src/sources/nominatim.js"
+      "src/sources/nominatim.js",
+      "config/splash-bounds.json",
+      "src/ui/splashOverlay.js",
+      "src/ui/mapViewPresets.js",
+      "src/ui/keyboardFlight.js",
+      "src/layers/cctv/hlsPlayback.js",
+      "src/ui/cctvMaximize.js",
+      "src/ui/cctvMedia.js",
+      "src/ui/cctvWall.js"
     ],
     "external": [
       "@mapbox/vector-tile",
@@ -1646,7 +1675,8 @@
       "egm96-universal",
       "mgrs",
       "pbf",
-      "satellite.js"
+      "satellite.js",
+      "hls.js"
     ]
   },
   "application-catalog": {
@@ -1995,7 +2025,8 @@
       "src/nominatimGeocode.js",
       "src/data/regionalModel.js",
       "src/sources/httpBody.js",
-      "src/sources/nominatim.js"
+      "src/sources/nominatim.js",
+      "src/layers/cctv/hlsPlayback.js"
     ],
     "external": [
       "cesium",
@@ -2003,7 +2034,8 @@
       "satellite.js",
       "@mapbox/vector-tile",
       "pbf",
-      "mgrs"
+      "mgrs",
+      "hls.js"
     ]
   },
   "application-operations": {
