@@ -18,6 +18,7 @@ import {
   CCTV_PLAYLIST_MAX_BYTES,
 } from './cctv/constants.js';
 import { sanitizeCctvRangeHeader } from './cctv/range.js';
+import { detectPersonsOnSource } from './cctv/detect.js';
 import {
   isHlsPlaylistResponse,
   mediaOriginFor,
@@ -37,6 +38,9 @@ export { CCTV_FRAME_FETCH_TIMEOUT_MS, fetchCctvImageFromUpstream };
  *   GET /api/cctv/stream/:id     — stream info (feedType, URLs) for a camera
  *   GET /api/cctv/media/:id      — proxy live video/image media from upstream
  *   GET /api/cctv/frame/:id      — single frame with fallback chain
+ *   GET /api/cctv/detect/:id     — YOLOv8 person detection on the camera's
+ *                                  upstream frame/stream (Human-Detector
+ *                                  service, default 127.0.0.1:5101)
  *
  * @returns {import('vite').Plugin}
  */
@@ -400,6 +404,36 @@ export function cctvProxy({ sourceRoot = process.cwd() } = {}) {
             );
             return;
           }
+        }
+
+        if (url.pathname.startsWith('/detect/')) {
+          // Deteksi orang YOLOv8 (Human-Detector) atas bingkai kamera.
+          // Hanya URL hulu terdaftar yang dipakai — lihat detect.js.
+          const cameraId =
+            decodeURIComponent(url.pathname.replace('/detect/', '').trim()) ||
+            'camera';
+          const source = sourceById.get(cameraId);
+          if (!source) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'camera not found' }));
+            return;
+          }
+          const outcome = await detectPersonsOnSource({ source });
+          const status = outcome.ok ? 200 : outcome.status || 502;
+          res.writeHead(status, {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          });
+          res.end(
+            JSON.stringify({
+              cameraId,
+              name: source.name || cameraId,
+              city: source.city || '',
+              frameSource: outcome.frameSource,
+              ...outcome.payload,
+            }),
+          );
+          return;
         }
 
         if (!url.pathname.startsWith('/frame/')) {

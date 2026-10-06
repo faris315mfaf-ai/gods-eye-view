@@ -1,5 +1,10 @@
 export function _clearCctvFrame() {
   this._cctvFrameRequestToken += 1;
+  // Kotak deteksi & gambar hasil milik bingkai kamera sebelumnya — jangan
+  // biarkan menempel pada kamera berikutnya.
+  this._clearCctvDetectOverlay?.();
+  this._clearCctvDetectResult?.();
+  this._setCctvDetectChip?.('ORANG · --', 'idle');
   if (this._cctvFramePreloader) {
     this._cctvFramePreloader.onload = null;
     this._cctvFramePreloader.onerror = null;

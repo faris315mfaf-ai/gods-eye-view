@@ -333,6 +333,68 @@
   background: rgba(255, 72, 72, 0.11);
 }
 
+/* Deteksi orang YOLOv8 (Human-Detector): kanvas kotak menutupi pratinjau
+   bingkai tanpa menangkap klik (klik pratinjau tetap membuka layar penuh). */
+.cctv-detect-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#cctv-detect-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 90px;
+  padding: 6px 8px;
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #8fe7ff;
+  background: rgba(0, 212, 255, 0.08);
+  text-transform: uppercase;
+}
+
+#cctv-detect-chip[data-detect-state='loading'] {
+  color: #ffe59b;
+  border-color: rgba(255, 205, 92, 0.45);
+  background: rgba(255, 205, 92, 0.1);
+}
+
+#cctv-detect-chip[data-detect-state='ok'] {
+  color: #adffbf;
+  border-color: rgba(141, 255, 135, 0.42);
+  background: rgba(141, 255, 135, 0.12);
+}
+
+#cctv-detect-chip[data-detect-state='error'] {
+  color: #ffb0b0;
+  border-color: rgba(255, 102, 102, 0.5);
+  background: rgba(255, 72, 72, 0.11);
+}
+
+/* Gambar hasil deteksi teranotasi (kotak + label + banner dari layanan
+   YOLOv8) — tampil untuk semua jenis kamera, termasuk HLS yang pratinjau
+   panelnya placeholder. */
+#cctv-detect-result-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#cctv-detect-result {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.5);
+  display: block;
+  background: rgba(8, 14, 19, 0.9);
+}
+
 .cctv-summary-label {
   font-family: var(--font-mono);
   font-size: 8px;

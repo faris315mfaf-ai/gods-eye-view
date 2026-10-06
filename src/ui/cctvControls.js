@@ -22,6 +22,16 @@ import {
   _initCctvWallControls,
   _syncAutoMaximizeButton,
 } from './cctvBindings.js';
+import {
+  _clearCctvDetectOverlay,
+  _clearCctvDetectResult,
+  _drawCctvDetectOverlay,
+  _initCctvDetectionControls,
+  _runCctvPersonDetection,
+  _setCctvDetectChip,
+  _showCctvDetectResult,
+  _toggleCctvDetectAuto,
+} from './cctvDetection.js';
 import { createCctvMaximizeViewer } from './cctvMaximize.js';
 import { createCctvWall } from './cctvWall.js';
 
@@ -42,6 +52,9 @@ export class CctvControls {
     this._cctvChipWasBusy = false;
     this._cctvFrameRequestToken = 0;
     this._cctvFramePreloader = null;
+    this._cctvDetectAuto = false;
+    this._cctvDetectAutoTimer = null;
+    this._cctvDetectBusy = false;
     this._calibrationEdit = null;
     this._actionGeneration = 0;
     // Penampil layar penuh dan preferensinya. Mati secara bawaan supaya alur
@@ -55,6 +68,7 @@ export class CctvControls {
         this._maximizeViewer?.open(cameraId, meta),
     });
     this._initCctvPanel();
+    this._initCctvDetectionControls();
   }
   listen(target, type, handler, options = {}) {
     target?.addEventListener(type, handler, {
@@ -122,6 +136,30 @@ export class CctvControls {
   _syncAutoMaximizeButton(...args) {
     return _syncAutoMaximizeButton.call(this, ...args);
   }
+  _setCctvDetectChip(...args) {
+    return _setCctvDetectChip.call(this, ...args);
+  }
+  _clearCctvDetectOverlay(...args) {
+    return _clearCctvDetectOverlay.call(this, ...args);
+  }
+  _drawCctvDetectOverlay(...args) {
+    return _drawCctvDetectOverlay.call(this, ...args);
+  }
+  _runCctvPersonDetection(...args) {
+    return _runCctvPersonDetection.call(this, ...args);
+  }
+  _showCctvDetectResult(...args) {
+    return _showCctvDetectResult.call(this, ...args);
+  }
+  _clearCctvDetectResult(...args) {
+    return _clearCctvDetectResult.call(this, ...args);
+  }
+  _toggleCctvDetectAuto(...args) {
+    return _toggleCctvDetectAuto.call(this, ...args);
+  }
+  _initCctvDetectionControls(...args) {
+    return _initCctvDetectionControls.call(this, ...args);
+  }
   destroy() {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -135,7 +173,10 @@ export class CctvControls {
     this._wall?.destroy();
     this._wall = null;
     this._clearCctvFrame();
+    this._clearCctvDetectOverlay();
+    this._clearCctvDetectResult();
     clearInterval(this._cctvSummaryTypingTimer);
+    clearInterval(this._cctvDetectAutoTimer);
     clearTimeout(this._cctvChipHideTimer);
     this._cctvSummaryTypingTimer = null;
     this._cctvChipHideTimer = null;

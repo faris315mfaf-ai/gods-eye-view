@@ -232,5 +232,9 @@
     "./sources/overpass": "./src/sources/overpass.js",
     "./search/nominatim": "./src/search/nominatim.js",
     "./sources/nominatim": "./src/sources/nominatim.js"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true,
+    "puppeteer@25.10.0": true
   }
 }

@@ -23,12 +23,25 @@
       </div>
       <div id="cctv-frame-wrap" class="cctv-frame-wrap">
         <img id="cctv-frame" alt="CCTV feed frame" />
+        <canvas id="cctv-detect-overlay" class="cctv-detect-overlay" hidden></canvas>
       </div>
       <div id="cctv-source-badge" role="status" aria-live="polite">SOURCE · UNKNOWN</div>
       <div id="cctv-meta">Enable CCTV to load camera intersections</div>
       <div class="cctv-controls">
         <button id="cctv-enable-btn" class="scene-btn">CCTV OFF</button>
         <button id="cctv-nearest-btn" class="scene-btn">NEAREST</button>
+      </div>
+      <div class="cctv-controls">
+        <button id="cctv-detect-btn" class="scene-btn" title="Run YOLOv8 person detection on the active camera feed">DETECT</button>
+        <button id="cctv-detect-auto-btn" class="scene-btn" title="Re-run person detection automatically every 15 seconds" aria-pressed="false">AUTO OFF</button>
+        <span id="cctv-detect-chip" role="status" aria-live="polite">PERSONS · --</span>
+      </div>
+      <div class="cctv-controls">
+        <a id="cctv-labeler-link" class="scene-btn" href="http://127.0.0.1:5102/" target="_blank" rel="noopener" title="Open the Human Labeler — capture CCTV frames and label persons for training datasets">LABELER</a>
+      </div>
+      <div id="cctv-detect-result-block" hidden>
+        <div class="cctv-summary-label">DETECTION RESULT</div>
+        <img id="cctv-detect-result" alt="Annotated person detection result" />
       </div>
       <div class="cctv-controls">
         <button id="cctv-prev-btn" class="scene-btn">PREV</button>
