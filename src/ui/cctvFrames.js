@@ -1,3 +1,9 @@
+import {
+  fetchStreamInfo,
+  isVideoFeed,
+  mountCameraMedia,
+} from './cctvMedia.js';
+
 export function _clearCctvFrame() {
   this._cctvFrameRequestToken += 1;
   // Kotak deteksi & gambar hasil milik bingkai kamera sebelumnya — jangan
@@ -88,8 +94,66 @@ export function _settleCctvFrame(token, src, ok) {
   syncBadge();
 }
 
-export function _syncCctvSourceBadge(activeCamera, enabled) {
-  if (!this._cctvSourceBadge) return;
+/**
+ * Lepaskan video langsung yang terpasang di pratinjau panel dan kembalikan
+ * jalur gambar (img) seperti semula.
+ */
+export function _detachCctvLiveVideo() {
+  if (this._cctvLiveMedia) {
+    try {
+      this._cctvLiveMedia.detach();
+    } catch {
+      /* pembongkaran tidak boleh melempar */
+    }
+    this._cctvLiveMedia.element?.remove();
+    this._cctvLiveMedia = null;
+    this._cctvLiveMediaCameraId = '';
+  }
+  if (this._cctvFrame?.style) this._cctvFrame.style.display = '';
+}
+
+/**
+ * Pasang VIDEO LANGSUNG di pratinjau panel untuk kamera HLS/video.
+ *
+ * KENAPA: untuk umpan video, `/api/cctv/frame/:id` hanya mengembalikan SVG
+ * sintetis (proxy tidak punya pendekode video), sehingga pratinjau panel
+ * dulu tampak beku padahal umpannya hidup — operator menyimpulkan "CCTV
+ * tidak jalan". Kini panel memutar stream yang sama dengan layar penuh
+ * (lewat mountCameraMedia + hls.js), dan jalur img tetap dipakai untuk
+ * kamera bingkai diam.
+ */
+export async function _syncCctvLiveVideo(camera, enabled) {
+  if (this.destroyed) return;
+  const wantsVideo = !!(enabled && camera && isVideoFeed(camera.feedType));
+  if (!wantsVideo) {
+    if (this._cctvLiveMedia) this._detachCctvLiveVideo();
+    return;
+  }
+  const cameraId = camera.id;
+  if (this._cctvLiveMediaCameraId === cameraId && this._cctvLiveMedia) {
+    return; // sudah terpasang untuk kamera ini
+  }
+  this._detachCctvLiveVideo();
+  this._cctvLiveMediaCameraId = cameraId;
+  const info = await fetchStreamInfo(cameraId);
+  if (this.destroyed || this._cctvLiveMediaCameraId !== cameraId) return;
+  if (!info?.mediaUrl) return; // tak ada media — biarkan jalur gambar bekerja
+  if (this._cctvFrame) this._cctvFrame.style.display = 'none';
+  const mounted = mountCameraMedia({
+    documentRef: document,
+    container: this._cctvFrameWrap,
+    info,
+    className: 'cctv-media cctv-live-video',
+    refreshMs: 0,
+  });
+  if (mounted) {
+    this._cctvFrameWrap?.classList.add('has-frame');
+    this._cctvFrameWrap?.classList.remove('loading');
+    this._cctvLiveMedia = mounted;
+  }
+}
+
+export function _syncCctvSourceBadge(activeCamera, enabled) {  if (!this._cctvSourceBadge) return;
   if (!enabled || !activeCamera) {
     this._cctvSourceBadge.textContent = 'SUMBER · TIDAK DIKETAHUI';
     this._cctvSourceBadge.dataset.frameState = 'idle';

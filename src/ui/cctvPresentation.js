@@ -1,3 +1,5 @@
+import { isVideoFeed } from './cctvMedia.js';
+
 export function _calBadgeLabel(badge) {
   switch (badge) {
     case 'calibrated':
@@ -189,7 +191,16 @@ export function _renderCctvState(state) {
     }
   }
 
-  if (this._cctvFrame) {
+  // Umpan video (HLS): pasang video langsung di panel — jalur img (bingkai
+  // sintetis) dilewati agar operator melihat umpan yang benar-benar hidup.
+  const videoFeed = !!(
+    enabled &&
+    activeCamera &&
+    isVideoFeed(activeCamera.feedType)
+  );
+  this._syncCctvLiveVideo(activeCamera, enabled);
+
+  if (this._cctvFrame && !videoFeed) {
     const nextSrc = enabled ? activeCamera?.frameUrl : null;
     const nextCameraId = enabled ? activeCamera?.id || '' : '';
     const cameraChanged = this._cctvFrame.dataset.cameraId !== nextCameraId;

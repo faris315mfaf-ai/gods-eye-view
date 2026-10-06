@@ -1,7 +1,9 @@
 import {
   _clearCctvFrame,
+  _detachCctvLiveVideo,
   _queueCctvFrame,
   _settleCctvFrame,
+  _syncCctvLiveVideo,
   _syncCctvSourceBadge,
 } from './cctvFrames.js';
 import {
@@ -100,6 +102,12 @@ export class CctvControls {
   _syncCctvSourceBadge(...args) {
     return _syncCctvSourceBadge.call(this, ...args);
   }
+  _syncCctvLiveVideo(...args) {
+    return _syncCctvLiveVideo.call(this, ...args);
+  }
+  _detachCctvLiveVideo(...args) {
+    return _detachCctvLiveVideo.call(this, ...args);
+  }
   _activeCctvCameraId(...args) {
     return _activeCctvCameraId.call(this, ...args);
   }
@@ -175,6 +183,7 @@ export class CctvControls {
     this._clearCctvFrame();
     this._clearCctvDetectOverlay();
     this._clearCctvDetectResult();
+    this._detachCctvLiveVideo();
     clearInterval(this._cctvSummaryTypingTimer);
     clearInterval(this._cctvDetectAutoTimer);
     clearTimeout(this._cctvChipHideTimer);

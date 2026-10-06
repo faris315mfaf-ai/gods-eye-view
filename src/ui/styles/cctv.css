@@ -302,6 +302,18 @@
   opacity: 1;
 }
 
+/* Video langsung HLS di pratinjau panel — meniru box img (#cctv-frame):
+   16:9 stabil antar kamera, object-fit contain agar stempel waktu provider
+   tidak terpotong. */
+.cctv-frame-wrap video.cctv-live-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  object-fit: contain;
+  display: block;
+  background: #04070b;
+}
+
 #cctv-meta {
   font-family: var(--font-mono);
   font-size: 9px;
